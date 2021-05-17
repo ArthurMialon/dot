@@ -1,0 +1,16 @@
+{
+  "tasks": {
+    "start": "deno run --allow-run --allow-env --allow-read --allow-write ./src/main.ts",
+    "compile": "deno compile --target=$COMPILE_TARGET --vendor --reload --allow-run --allow-env --allow-read --allow-write --output build/$COMPILE_NAME ./src/main.ts",
+    "format": "deno fmt && deno lint"
+  },
+  "imports": {
+    "@cliffy/command": "jsr:@cliffy/command@^1.0.0-rc.7",
+    "@cliffy/flags": "jsr:@cliffy/flags@^1.0.0-rc.7",
+    "@cliffy/prompt": "jsr:@cliffy/prompt@1.0.0-rc.7",
+    "@cliffy/table": "jsr:@cliffy/table@1.0.0-rc.7",
+    "@std/assert": "jsr:@std/assert@1",
+    "@std/fs": "jsr:@std/fs@^1.0.6",
+    "@std/path": "jsr:@std/path@^1.0.8"
+  }
+}
