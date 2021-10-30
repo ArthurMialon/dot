@@ -1,0 +1,8 @@
+{
+  "imports": {
+    "flags/": "https://deno.land/std@0.113.0/flags/",
+    "yargs": "https://cdn.deno.land/yargs/versions/yargs-v16.2.1-deno/raw/deno.ts",
+    "/": "./src/",
+    "./": "./src/"
+  }
+}
