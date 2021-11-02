@@ -8,7 +8,7 @@ import { Command } from "/types.d.ts";
  */
 export const findCommand = (
   commands: Command[],
-  command: string
+  command: string,
 ): Command | null => {
   return (
     commands.find((c) => {

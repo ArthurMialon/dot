@@ -1,5 +1,4 @@
-
-# Dot. 
+# Dot.
 
 A CLI to manage your Dotfiles build with Deno
 

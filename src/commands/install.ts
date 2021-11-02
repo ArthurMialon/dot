@@ -1,3 +1,18 @@
-export function install({ repository, targetDirectory }) {
-  console.log("install from repo", repository, "into", targetDirectory);
+import { Command } from '/types.d.ts'
+
+import * as flags from '/core/flags.ts'
+
+export const Install: Command = {
+  name: 'install',
+
+  aliases: ['i'],
+
+  flags: {
+    target: flags.string()
+  },
+
+  run: (args) => {
+    console.log('hello world')
+    console.log(args)
+  }
 }

@@ -1,17 +1,24 @@
 export interface Arguments {
-  from: string;
-  to: string;
-  body: string;
-  sid: string;
-  apikey: string;
-  secret: string;
+  [key: string]: any
 }
+
+export interface ArgumentsDefinition {
+  [key: string]: {
+    type: 'string' | 'number' | 'boolean' | 'list'
+  }
+}
+
+interface FlagsDefinition {
+  [key: string]: Function
+}
+
+type FlagLoaderType<T> = (args: Arguments) => T
 
 export interface Command {
   name: string;
 
   aliases?: string[];
 
-  arguments: Arguments;
-  run: (args: Arguments) => any | Promise<any>;
+  flags: FlagsDefinition;
+  run: (args?: Arguments) => any | Promise<any>;
 }

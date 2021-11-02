@@ -6,7 +6,7 @@
       {
         "match": "\\.ts$",
         "cmd": "deno install -f --import-map=import_map.json --name dot index.ts"
-      },
-   ]
+      }
+    ]
   }
 }

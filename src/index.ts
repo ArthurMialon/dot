@@ -1,23 +1,28 @@
-import { parse } from "flags/mod.ts";
 import yargs from "yargs";
 
 import { Arguments, Command } from "/types.d.ts";
 
-const commands = [];
+import { findCommand } from '/core/command.ts'
+import { Install } from '/commands/install.ts'
+
+const commands: Command[] = [Install];
 
 async function main(args: string[]) {
-  let inputArgs: Arguments = yargs(args)
-    .alias("f", "from")
-    .alias("t", "to")
-    .alias("b", "body")
-    .alias("i", "sid")
-    .alias("k", "apikey")
-    .alias("s", "secret").argv;
+  let inputArgs: Arguments = yargs(args).argv
 
-  console.log("test");
+  const command = inputArgs["_"][0];
 
-  const command = "_";
-  console.log(inputArgs);
+  const foundCommand = findCommand(commands, command)
+
+  if (!foundCommand) {
+    return console.log(`Command ${command} not found`)
+  }
+
+  const load = foundCommand.flags.target()
+
+  const target = load({})
+
+  console.log(target)
 }
 
 main(Deno.args);
