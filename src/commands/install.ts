@@ -3,16 +3,16 @@ import { Command } from '/types.d.ts'
 import * as flags from '/core/flags.ts'
 
 export const Install: Command = {
-  name: 'install',
+  name: "install",
 
-  aliases: ['i'],
+  aliases: ["i"],
 
   flags: {
-    target: flags.string()
+    target: () => 1,
   },
 
   run: (args) => {
-    console.log('hello world')
-    console.log(args)
-  }
-}
+    console.log("hello world");
+    console.log(args);
+  },
+};
