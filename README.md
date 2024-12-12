@@ -1,6 +1,6 @@
 # Dot.
 
-A CLI to manage your Dotfiles built with [Deno 2](https://deno.com/) and
+👉 A CLI to manage your Dotfiles built with [Deno 2](https://deno.com/) and
 [Cliffy](https://cliffy.io/) inspired by
 [GNU Stow](https://www.gnu.org/software/stow/)
 
