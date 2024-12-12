@@ -4,6 +4,10 @@
 [Cliffy](https://cliffy.io/) inspired by
 [GNU Stow](https://www.gnu.org/software/stow/)
 
+## Install
+
+`curl -fsSL https://raw.githubusercontent.com/arthurmialon/dot/main/install.sh | bash`
+
 ## Concepts
 
 **Dot CLI automatically creates symlinks for you.**
@@ -64,10 +68,6 @@ Example for the **ZSH** package:
   configurations
 - Add new files or folders to your dotfiles from local directory
 - Quickly open editor to edit your dotfiles
-
-## Install
-
-`curl -fsSL https://raw.githubusercontent.com/arthurmialon/dot/main/install.sh | bash`
 
 ## Getting Started
 
