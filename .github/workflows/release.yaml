@@ -24,7 +24,6 @@ jobs:
       - name: Generate version
         id: version
         uses: paulhatch/semantic-version@v5.3.0
-        if: ${{ ! startsWith(github.head_commit.message , 'chore:') }}
         with:
           tag_prefix: "v"
           major_pattern: "BREAKING CHANGE:"
@@ -59,7 +58,6 @@ jobs:
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
-        if: ${{ steps.version.outputs.version }}
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: Release v${{ steps.version.outputs.version }}
