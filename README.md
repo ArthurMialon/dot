@@ -4,8 +4,10 @@
 [Cliffy](https://cliffy.io/) inspired by
 [GNU Stow](https://www.gnu.org/software/stow/)
 
+
 ## Table of Contents
 
+- [Demo](#demo)
 - [Installation](#installation)
 - [Concepts](#concepts)
 - [Features](#features)
@@ -19,6 +21,10 @@
   - [Edit](#edit)
   - [Upgrade](#upgrade)
 - [Ignore](#ignore)
+
+## Demo
+
+https://github.com/user-attachments/assets/f6ea3f99-7115-408a-bc6d-23a0f29378b4
 
 ## Installation
 
