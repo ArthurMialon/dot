@@ -73,13 +73,13 @@ Example for the **ZSH** package:
 **Remote repository:**
 
 ```bash
-$ dot init git@github.com:<USERNAME>/dotfiles.git
+dot init git@github.com:<USERNAME>/dotfiles.git
 ```
 
 **Local repository**
 
 ```bash
-$ dot init
+dot init
 ```
 
 `dot init` setup the **dotfiles location** and the **target** (default:
@@ -99,13 +99,13 @@ command.
 Basic setup. Ask you to set locations to your dotfiles and the target location.
 
 ```bash
-$ dot init
+dot init
 ```
 
 **With arguments:** You can clone your dotfiles repository and link all packages.
 
 ```bash
-$ dot init git@github.com:ArthurMialon/dotfiles.git
+dot init git@github.com:ArthurMialon/dotfiles.git
 ```
 
 ### Link
@@ -115,7 +115,7 @@ Link all packages to your `$HOME` directory (can be update with configuration).
 **Basic:**
 
 ```bash
-$ dot unlink
+dot unlink
 ```
 
 **Aliases:**
@@ -130,7 +130,7 @@ $ dot unlink
 **With arguments:** Link only a specific pacakge.
 
 ```bash
-$ dot link zsh
+dot link zsh
 ```
 
 ### Unlink
@@ -141,7 +141,7 @@ to remove the symlinks.
 **Basic:**
 
 ```bash
-$ dot unlink
+dot unlink
 ```
 
 **Aliases:**
@@ -157,7 +157,7 @@ $ dot unlink
 **With arguments:** Link only a specific pacakge.
 
 ```bash
-$ dot unlink zsh
+dot unlink zsh
 ```
 
 ### Config
@@ -167,13 +167,13 @@ Show the current configuration.
 **Basic:**
 
 ```bash
-$ dot config
+dot config
 ```
 
 Edit the current configuration (source and target).
 
 ```bash
-$ dot config edit
+dot config edit
 ```
 
 ### Add
@@ -184,21 +184,21 @@ packages and update to symlink.
 **Basic:**
 
 ```bash
-$ dot add .
+dot add .
 ```
 
 Add a the current folder to a specific package (if not exist, the package will
 be created).
 
 ```bash
-$ dot add . zsh
+dot add . zsh
 ```
 
 Add a specific to a specific package (if not exist, the package will be
 created).
 
 ```bash
-$ dot add .zshrc zsh
+dot add .zshrc zsh
 ```
 
 ### Edit
@@ -208,7 +208,7 @@ Open the dotfiles repository in your default editor.
 **Basic:**
 
 ```bash
-$ dot edit
+dot edit
 ```
 
 **Aliases:**
@@ -220,7 +220,7 @@ $ dot edit
 You can upgrade the Dot CLI with the following command.
 
 ```bash
-$ dot upgrade
+dot upgrade
 ```
 
 ### Ignore
