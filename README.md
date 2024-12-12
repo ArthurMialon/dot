@@ -4,6 +4,22 @@
 [Cliffy](https://cliffy.io/) inspired by
 [GNU Stow](https://www.gnu.org/software/stow/)
 
+## Table of Contents
+
+- [Installation](#installation)
+- [Concepts](#concepts)
+- [Features](#features)
+- [Getting Started](#getting-started)
+- [Commands](#commands)
+  - [Init](#init)
+  - [Link](#link)
+  - [Unlink](#unlink)
+  - [Config](#config)
+  - [Add](#add)
+  - [Edit](#edit)
+  - [Upgrade](#upgrade)
+- [Ignore](#ignore)
+
 ## Installation
 
 `curl -fsSL https://raw.githubusercontent.com/arthurmialon/dot/main/install.sh | bash`
@@ -239,7 +255,7 @@ dot upgrade
 
 ---
 
-### Ignore
+## Ignore folder and files
 
 Create a `.dotignore` file to avoid link some files or folders. It follows the
 same rules as `.gitignore`. By default it always ignore the `.git` folder and
@@ -254,9 +270,3 @@ the `.dotignore` file.
 # Ignore the script
 scripts/
 ```
-
-## Todo
-
-- Add upgrade commande
-- Add colors
-- Improve bundle size
