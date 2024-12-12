@@ -20,7 +20,8 @@ export default new Command()
   .action(async ({ verbose, force }, requestedPkg) => {
     const configuration = await config.get();
 
-    const pkgs = await packages.list(configuration.repo);
+    const pkgs = await packages.list(configuration.repo)
+      .catch(() => [])
 
     const filteredPkgs = pkgs
       .filter((pkg) => {
