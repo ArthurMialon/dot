@@ -94,6 +94,8 @@ repository and link them to the target directory.
 You can use the `--help` flag everywhere to get more information about the
 command.
 
+---
+
 ### Init
 
 Basic setup. Ask you to set locations to your dotfiles and the target location.
@@ -107,6 +109,8 @@ dot init
 ```bash
 dot init git@github.com:ArthurMialon/dotfiles.git
 ```
+
+---
 
 ### Link
 
@@ -132,6 +136,8 @@ dot unlink
 ```bash
 dot link zsh
 ```
+
+---
 
 ### Unlink
 
@@ -160,6 +166,8 @@ dot unlink
 dot unlink zsh
 ```
 
+---
+
 ### Config
 
 Show the current configuration.
@@ -175,6 +183,8 @@ Edit the current configuration (source and target).
 ```bash
 dot config edit
 ```
+
+---
 
 ### Add
 
@@ -201,6 +211,8 @@ created).
 dot add .zshrc zsh
 ```
 
+---
+
 ### Edit
 
 Open the dotfiles repository in your default editor.
@@ -215,6 +227,8 @@ dot edit
 
 - `dot open`
 
+---
+
 ### Upgrade
 
 You can upgrade the Dot CLI with the following command.
@@ -222,6 +236,8 @@ You can upgrade the Dot CLI with the following command.
 ```bash
 dot upgrade
 ```
+
+---
 
 ### Ignore
 
