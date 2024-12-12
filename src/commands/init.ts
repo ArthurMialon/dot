@@ -1,23 +1,48 @@
 import Dot from "../dot.ts";
 import { blue, bold } from "@std/fmt/colors";
 import { Command } from "@cliffy/command";
-import { Confirm } from "@cliffy/prompt";
+import { Confirm, Input } from "@cliffy/prompt";
 import list from "./list.ts";
 import link from "./link.ts";
 import configEditPrompt from "../prompt/config-edit.ts";
 import * as config from "../tools/config.ts";
 import * as log from "../tools/logging.ts";
+import * as git from "../tools/git.ts";
 
 export default new Command()
   .description("Initialize dot CLI with valid configuration.")
-  .action(async () => {
+  .arguments("[repository]")
+  .action(async (_flags, remoteRepository) => {
     log.info(blue(`👋 Welcome to ${Dot.title}.`));
     log.info(
-      "👉 Setup the location of your dotfiles repository and the target location.\n",
+      "👉 Setup starts with location of your dotfiles repository and the target location.\n",
     );
+
+    if (remoteRepository) {
+      log.info("Remote repository", bold(remoteRepository));
+      const confirmClone = await Confirm.prompt({
+        message: `Clone it as your dotfiles repository?`,
+      });
+
+      if (!confirmClone) {
+        log.info(`Aborted`);
+        Deno.exit(0);
+      }
+
+      const cloned = await git.clone(remoteRepository, "dotfiles");
+
+      if (!cloned) {
+        log.error(`Failed to clone repository ${remoteRepository}`);
+        Deno.exit(1);
+      }
+    }
 
     // Avoid throw if config not yet initialized
     const configuration = await config.get({ safe: true });
+
+    configuration.repo = remoteRepository
+      ? (await Deno.realPath("./dotfiles"))
+      : configuration.repo;
 
     const configPrompt = await configEditPrompt(configuration);
 
@@ -36,7 +61,9 @@ export default new Command()
     });
 
     if (!confirm) {
-      log.info(`If you want to link your dotfiles later, run: ${Dot.bin} link`);
+      log.success(
+        `Link your dotfiles later, with: ${Dot.bin} link`,
+      );
       Deno.exit(0);
     }
 

@@ -4,7 +4,7 @@
 [Cliffy](https://cliffy.io/) inspired by
 [GNU Stow](https://www.gnu.org/software/stow/)
 
-## Install
+## Installation
 
 `curl -fsSL https://raw.githubusercontent.com/arthurmialon/dot/main/install.sh | bash`
 
@@ -48,13 +48,13 @@ Examples of structure:
     └── .zshrc
 ```
 
-With `dot link` the files are automatically symlinked to your `$HOME` directory
+Dot CLI automatically symlinked all files to your `$HOME` directory
 (or any directory you want to target). It follows the structure inside each
 package.
 
 Example for the **ZSH** package:
 
-```shell
+```bash
 # Symlinked files
 ~/.zshrc -> dotfiles/zsh/.zshrc
 ~/.config/zsh/functions.zsh -> dotfiles/zsh/.config/zsh/functions.zsh
@@ -70,7 +70,19 @@ Example for the **ZSH** package:
 
 ## Getting Started
 
-Run `dot init` to setup your **dotfiles location** and the **target** (default:
+**Remote repository:**
+
+```bash
+$ dot init git@github.com:<USERNAME>/dotfiles.git
+```
+
+**Local repository**
+
+```bash
+$ dot init
+```
+
+`dot init` setup the **dotfiles location** and the **target** (default:
 `$HOME`).
 
 The Dot CLI will ask you to set the paths to your dotfiles repository and the
@@ -86,20 +98,14 @@ command.
 
 Basic setup. Ask you to set locations to your dotfiles and the target location.
 
-```shell
+```bash
 $ dot init
 ```
 
-**With arguments:** Clone your dotfiles repository and link all packages.
+**With arguments:** You can clone your dotfiles repository and link all packages.
 
-```shell
+```bash
 $ dot init git@github.com:ArthurMialon/dotfiles.git
-```
-
-Or use the local directory.
-
-```shell
-$ dot init ./
 ```
 
 ### Link
@@ -108,7 +114,7 @@ Link all packages to your `$HOME` directory (can be update with configuration).
 
 **Basic:**
 
-```shell
+```bash
 $ dot unlink
 ```
 
@@ -123,7 +129,7 @@ $ dot unlink
 
 **With arguments:** Link only a specific pacakge.
 
-```shell
+```bash
 $ dot link zsh
 ```
 
@@ -134,7 +140,7 @@ to remove the symlinks.
 
 **Basic:**
 
-```shell
+```bash
 $ dot unlink
 ```
 
@@ -150,7 +156,7 @@ $ dot unlink
 
 **With arguments:** Link only a specific pacakge.
 
-```shell
+```bash
 $ dot unlink zsh
 ```
 
@@ -160,13 +166,13 @@ Show the current configuration.
 
 **Basic:**
 
-```shell
+```bash
 $ dot config
 ```
 
 Edit the current configuration (source and target).
 
-```shell
+```bash
 $ dot config edit
 ```
 
@@ -177,21 +183,21 @@ packages and update to symlink.
 
 **Basic:**
 
-```shell
+```bash
 $ dot add .
 ```
 
 Add a the current folder to a specific package (if not exist, the package will
 be created).
 
-```shell
+```bash
 $ dot add . zsh
 ```
 
 Add a specific to a specific package (if not exist, the package will be
 created).
 
-```shell
+```bash
 $ dot add .zshrc zsh
 ```
 
@@ -201,13 +207,21 @@ Open the dotfiles repository in your default editor.
 
 **Basic:**
 
-```shell
+```bash
 $ dot edit
 ```
 
 **Aliases:**
 
 - `dot open`
+
+### Upgrade
+
+You can upgrade the Dot CLI with the following command.
+
+```bash
+$ dot upgrade
+```
 
 ### Ignore
 

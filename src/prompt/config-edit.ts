@@ -1,4 +1,3 @@
-import { bold } from "@std/fmt/colors";
 import { exists } from "@std/fs";
 import { Input } from "@cliffy/prompt";
 import { DotConfig } from "../tools/config.ts";
@@ -13,11 +12,6 @@ const validatePath = async (value: string) => {
 };
 
 export default async (configuration: DotConfig) => {
-  log.info(
-    "Configuration location is",
-    bold(configuration.configPath),
-  );
-
   const targetLocationPrompt = await Input.prompt({
     message: "Target location for symlinks",
     default: configuration.target,

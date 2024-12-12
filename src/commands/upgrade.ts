@@ -1,5 +1,5 @@
-import Dot from "../dot.ts";
 import { copy, readerFromStreamReader } from "@std/io";
+import Dot from "../dot.ts";
 import * as log from "../tools/logging.ts";
 import { Command } from "@cliffy/command";
 import { bold } from "@std/fmt/colors";
