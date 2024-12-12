@@ -1,5 +1,6 @@
 import { Command } from "@cliffy/command";
 import * as config from "../../tools/config.ts";
+import * as log from "../../tools/logging.ts";
 import configCommand from "./index.ts";
 import configEditPrompt from "../../prompt/config-edit.ts";
 
@@ -14,7 +15,7 @@ const edit = new Command()
 
     await configCommand.parse([]);
 
-    console.log("Configuration edited");
+    log.success("Configuration edited");
   });
 
 export default edit;

@@ -1,8 +1,10 @@
+import { bold } from "@std/fmt/colors";
 import { join } from "@std/path";
 import { Command } from "@cliffy/command";
 import { Confirm } from "@cliffy/prompt";
 import * as config from "../tools/config.ts";
 import * as packages from "../tools/packages.ts";
+import * as log from "../tools/logging.ts";
 
 export default new Command()
   .description("Unlink your packages from target")
@@ -27,14 +29,14 @@ export default new Command()
       });
 
     if (filteredPkgs.length === 0) {
-      console.log("No package to unlink");
-      console.log(`Requested: ${requestedPkg || "all"}`);
+      log.info("No package to unlink");
+      log.info(`Requested: ${bold(requestedPkg || "all")}`);
       return;
     }
 
-    console.log(`Ready to unlink ${filteredPkgs.length} package(s)`);
-    console.log(
-      `Packages: ${filteredPkgs.map((pkg) => pkg.name).join(", ")}`,
+    log.info(`Ready to unlink ${filteredPkgs.length} package(s)`);
+    log.info(
+      `Packages: ${bold(filteredPkgs.map((pkg) => pkg.name).join(", "))}`,
     );
 
     if (!force) {
@@ -46,20 +48,20 @@ export default new Command()
     }
 
     for await (const pkg of filteredPkgs) {
-      console.log(
-        `Unlinked ${pkg.files.length} file(s) from package ${pkg.name}`,
+      log.success(
+        `Unlinked ${pkg.files.length} file(s) from package ${bold(pkg.name)}`,
       );
 
       if (verbose) {
         pkg.files.forEach((file) => {
-          console.log(
+          log.info(
             "Unlinked",
             join(configuration.target, file.directory, file.name),
             "->",
             join(file.directory, file.name),
           );
         });
-        console.log("");
+        log.info("");
       }
 
       await packages.unlinkPackage(configuration, pkg);

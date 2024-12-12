@@ -1,5 +1,6 @@
 import { Command } from "@cliffy/command";
 import * as config from "../tools/config.ts";
+import * as log from "../tools/logging.ts";
 
 export default new Command()
   .description("Open the dotfiles in your editor.")
@@ -10,8 +11,8 @@ export default new Command()
     const editor = Deno.env.get("EDITOR");
 
     if (!editor) {
-      console.error("Please, set the EDITOR environment variable.");
-      console.log("Example with Vim: export EDITOR=vim");
+      log.error("Please, set the EDITOR environment variable.");
+      log.info("Example with Vim: export EDITOR=vim");
       Deno.exit(1);
     }
 

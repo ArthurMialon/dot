@@ -1,8 +1,7 @@
 import { Command } from "@cliffy/command";
 import { Table } from "@cliffy/table";
-
+import * as log from "../../tools/logging.ts";
 import { get } from "../../tools/config.ts";
-
 import edit from "./edit.ts";
 
 const displayConfig = async () => {
@@ -19,7 +18,7 @@ const displayConfig = async () => {
       ["Target", configuration.target],
     ]);
 
-  console.log(table.toString());
+  log.info(table.toString());
 };
 
 export default new Command()

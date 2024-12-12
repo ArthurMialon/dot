@@ -3,6 +3,8 @@ import { Command } from "@cliffy/command";
 import { Confirm } from "@cliffy/prompt";
 import * as config from "../tools/config.ts";
 import * as packages from "../tools/packages.ts";
+import * as log from "../tools/logging.ts";
+import { bold } from "@std/fmt/colors";
 
 export default new Command()
   .description("Link your packages to target")
@@ -30,14 +32,14 @@ export default new Command()
       });
 
     if (filteredPkgs.length === 0) {
-      console.log("No package to link");
-      console.log(`Requested: ${requestedPkg || "all"}`);
+      log.info("No package to link");
+      log.info(`Requested: ${bold(requestedPkg || "all")}`);
       return;
     }
 
-    console.log(`Ready to apply ${filteredPkgs.length} package(s)`);
-    console.log(
-      `Packages: ${filteredPkgs.map((pkg) => pkg.name).join(", ")}`,
+    log.info(`Ready to apply ${bold(filteredPkgs.length + " package(s)")}`);
+    log.info(
+      `Packages: ${bold(filteredPkgs.map((pkg) => pkg.name).join(", "))}`,
     );
 
     if (!force) {
@@ -49,17 +51,19 @@ export default new Command()
     }
 
     for await (const pkg of filteredPkgs) {
-      console.log(`Set ${pkg.files.length} file(s) from package ${pkg.name}`);
+      log.success(
+        `Set ${pkg.files.length} file(s) from package ${bold(pkg.name)}`,
+      );
 
       if (verbose) {
         pkg.files.forEach((file) => {
-          console.log(
+          log.info(
             join(configuration.target, file.directory, file.name),
             "->",
             join(file.directory, file.name),
           );
         });
-        console.log("");
+        log.info("");
       }
 
       await packages.linkPackage(configuration, pkg);

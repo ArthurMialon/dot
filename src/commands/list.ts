@@ -1,8 +1,10 @@
+import { bold } from "@std/fmt/colors";
 import { join } from "@std/path";
 import { Command } from "@cliffy/command";
 import { Table } from "@cliffy/table";
 import * as config from "../tools/config.ts";
 import * as packages from "../tools/packages.ts";
+import * as log from "../tools/logging.ts";
 
 export default new Command()
   .description("List your packages")
@@ -23,14 +25,14 @@ export default new Command()
 
     for await (const pkg of pkgs) {
       body.push([
-        pkg.name,
+        bold(pkg.name),
         verbose
-          ? pkg.files.map((file) => join(file.directory, file.name)).join(", ")
+          ? pkg.files.map((file) => join(file.directory, file.name)).join("\n")
           : pkg.files.length.toString(),
       ]);
     }
 
     table.body(body);
 
-    console.log(table.toString());
+    log.info(table.toString());
   });

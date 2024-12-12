@@ -5,6 +5,8 @@ import { Confirm, Input } from "@cliffy/prompt";
 import * as config from "../tools/config.ts";
 import link from "./link.ts";
 import { copyWithCP } from "../utils.ts";
+import * as log from "../tools/logging.ts";
+import { bold } from "@std/fmt/colors";
 
 export default new Command()
   .description("Add new files or folder to your dotfiles.")
@@ -21,18 +23,25 @@ export default new Command()
     const configuration = await config.get();
 
     if (!(await exists(path))) {
-      console.error(`The path ${path} does not exist.`);
+      log.error(`The path ${path} does not exist.`);
       Deno.exit(1);
     }
 
     const requestedPath = await Deno.realPath(path);
+
+    log.info(
+      "Adding",
+      bold(requestedPath),
+      "to your dotfiles",
+      requestedPkg ? `in ${bold(requestedPkg)}` : "",
+    );
 
     const pkgArg = await (requestedPkg || Input.prompt({
       message: "Enter the package name",
     }));
 
     if (!pkgArg) {
-      console.error("You must provide a package name.");
+      log.error("You must provide a package name.");
       Deno.exit(1);
     }
 
@@ -42,11 +51,11 @@ export default new Command()
 
     const pkgPath = join(configuration.repo, pkg);
 
-    console.log("About to copy all content from target to your dotfiles");
-    console.log("Content:", requestedPath);
-    console.log(
+    log.info("About to copy all content from target to your dotfiles");
+    log.info("Content:", bold(requestedPath));
+    log.info(
       "To:     ",
-      join(pkgPath, relative(configuration.target, requestedPath)),
+      bold(join(pkgPath, relative(configuration.target, requestedPath))),
     );
 
     const confirm = force || (await Confirm.prompt({
@@ -54,12 +63,12 @@ export default new Command()
     }));
 
     if (!confirm) {
-      console.log("Aborted.");
+      log.info("Aborted.");
       Deno.exit(0);
     }
 
     if (!(await exists(pkgPath))) {
-      console.log("Create your package", pkg);
+      log.info("Creation of your package", bold(pkg));
       await Deno.mkdir(pkgPath, { recursive: true });
     }
 

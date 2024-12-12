@@ -1,17 +1,18 @@
+import { blue, bold } from "@std/fmt/colors";
 import { Command } from "@cliffy/command";
 import { Confirm } from "@cliffy/prompt";
 import list from "./list.ts";
 import link from "./link.ts";
 import configEditPrompt from "../prompt/config-edit.ts";
-
 import * as config from "../tools/config.ts";
+import * as log from "../tools/logging.ts";
 
 export default new Command()
   .description("Initialize dot CLI with valid configuration.")
   .action(async () => {
-    console.log("Welcome to Dot CLI.");
-    console.log(
-      "Setup the location of your dotfiles repository and the target location.",
+    log.info(blue("👋 Welcome to Dot CLI."));
+    log.info(
+      "👉 Setup the location of your dotfiles repository and the target location.\n",
     );
 
     // Avoid throw if config not yet initialized
@@ -25,7 +26,7 @@ export default new Command()
       initialized: true,
     });
 
-    console.log("Dot CLI initialized.");
+    log.success("\n💪 Dot CLI initialized successfully!");
 
     await list.parse([]);
 
@@ -34,19 +35,18 @@ export default new Command()
     });
 
     if (!confirm) {
-      console.log("If you want to link your dotfiles later, run: dot link");
+      log.info("If you want to link your dotfiles later, run: dot link");
       Deno.exit(0);
     }
 
     await link.parse([
       "-f",
-      "-v",
     ]);
 
     const configurationReady = await config.get();
 
-    console.log(
-      "Your Dofiles are now linked to your target",
-      configurationReady.target,
+    log.success(
+      "\nYour dotfiles are now linked to your target",
+      bold(configurationReady.target),
     );
   });

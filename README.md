@@ -24,7 +24,6 @@ Examples of structure:
 │       ├── cli
 │       │   └── alias
 │       ├── config
-│       └── credentials
 ├── brew (package)
 │   └── Brewfile
 ├── git (package)
@@ -228,6 +227,6 @@ scripts/
 
 ## Todo
 
+- Add upgrade commande
 - Add colors
 - Improve bundle size
-- Deploy for multiple platforms

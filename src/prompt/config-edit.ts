@@ -1,19 +1,21 @@
+import { bold } from "@std/fmt/colors";
 import { exists } from "@std/fs";
 import { Input } from "@cliffy/prompt";
 import { DotConfig } from "../tools/config.ts";
+import * as log from "../tools/logging.ts";
 
 const validatePath = async (value: string) => {
   if (!(await exists(value))) {
-    console.log("\nThis path does not exist");
+    log.info("\nThis path does not exist");
     return false;
   }
   return true;
 };
 
 export default async (configuration: DotConfig) => {
-  console.log(
+  log.info(
     "Configuration location is",
-    configuration.configPath,
+    bold(configuration.configPath),
   );
 
   const targetLocationPrompt = await Input.prompt({

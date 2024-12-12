@@ -8,11 +8,13 @@ import link from "./commands/link.ts";
 import unlink from "./commands/unlink.ts";
 import add from "./commands/add.ts";
 
+import * as log from "./tools/logging.ts";
+
 const command = new Command()
   .name("dot")
   .version("__VERSION__")
   .description("Easily manage your dotfiles.")
-  .action((): void => console.log(command.getHelp()))
+  .action((): void => log.info(command.getHelp()))
   .command("init", init)
   .command("config", config)
   .command("list", list)
