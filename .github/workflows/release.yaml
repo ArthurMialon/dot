@@ -30,7 +30,7 @@ jobs:
           minor_pattern: "feat:"
 
       - name: Write version in the main file
-        run: sed -i "s/__VERSION__/${{ steps.version.outputs.version }}/g" ./src/main.ts
+        run: sed -i "s/__VERSION__/${{ steps.version.outputs.version }}/g" ./src/dot.ts
 
       - name: Build CLI for aarch64-apple-darwin
         run: |

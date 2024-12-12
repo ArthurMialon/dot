@@ -1,8 +1,9 @@
+import Dot from "../dot.ts";
 import { exists } from "@std/fs";
 
 const DEFAULT_IGNORE_CONTENT = `
 .git/
-.dotignore
+${Dot.ignoreFileName}
 `;
 
 export class IgnoreFile {

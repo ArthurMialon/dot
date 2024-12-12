@@ -1,9 +1,8 @@
 import type { DotConfig } from "./config.ts";
-
 import { dirname, join } from "@std/path";
-
-import { IgnoreFile } from "../tools/ignore.ts";
 import { exists } from "@std/fs";
+import Dot from "../dot.ts";
+import { IgnoreFile } from "../tools/ignore.ts";
 
 interface SourceFile extends Deno.DirEntry {
   // targeted directory
@@ -24,7 +23,7 @@ const listSourceFiles = async (
   folder: string = "",
   subFolder: string = "",
 ): Promise<SourceFile[]> => {
-  const ignoreFile = new IgnoreFile(join(path, ".dotignore"));
+  const ignoreFile = new IgnoreFile(join(path, Dot.ignoreFileName));
   const result: SourceFile[] = [];
   const packagePath = join(path, folder);
   const fullPath = join(packagePath, subFolder);
@@ -73,7 +72,7 @@ const getPackage = async (
 };
 
 export const list = async (path: string) => {
-  const ignoreFile = new IgnoreFile(join(path, ".dotignore"));
+  const ignoreFile = new IgnoreFile(join(path, Dot.ignoreFileName));
 
   const dotPackages: DotPackage[] = [];
 

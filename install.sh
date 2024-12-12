@@ -22,7 +22,7 @@ DOWNLOAD_URL="https://github.com/$REPO/releases/latest/download/${BINARY_NAME}-$
 INSTALL_DIR="${HOME}/.dot"
 mkdir -p "$INSTALL_DIR"
 
-echo "Downloading $BINARY_NAME with ${OS}-${ARCH} $"
+echo "Downloading $BINARY_NAME for ${OS}-${ARCH} $"
 
 rm -f $INSTALL_DIR/$BINARY_NAME
 rm -f "$HOME/.local/bin/dot"
@@ -42,4 +42,4 @@ if ! echo "$PATH" | grep -q "$INSTALL_DIR"; then
     export PATH=$PATH:$INSTALL_DIR
 fi
 
-echo "$BINARY_NAME successfully installed in $INSTALL_DIR"
+echo "Dot CLI successfully installed in $INSTALL_DIR"

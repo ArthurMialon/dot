@@ -1,10 +1,5 @@
 import { exists } from "@std/fs";
-
-const CONFIG_DIR = `${Deno.env.get("HOME")}/.dot`;
-const CONFIG_PATH = `${CONFIG_DIR}/config`;
-
-const DEFAULT_REPO = `${Deno.env.get("HOME")}/dotfiles`;
-const DEFAULT_TARGET = `${Deno.env.get("HOME")}`;
+import Dot from "../dot.ts";
 
 export interface DotConfig {
   configPath: string;
@@ -18,23 +13,23 @@ export const defaultConfig: DotConfig = {
   initialized: false,
 
   // CLI configuration
-  configPath: CONFIG_PATH,
-  configDirectory: CONFIG_DIR,
+  configPath: Dot.configPath,
+  configDirectory: Dot.configDirectory,
 
   // dotfiles configuration
-  repo: DEFAULT_REPO,
-  target: DEFAULT_TARGET,
+  repo: Dot.defaultRepo,
+  target: Dot.defaultTarget,
 };
 
 export const get = async (
   options: { safe?: boolean } = {},
 ): Promise<DotConfig> => {
-  if (!(await exists(CONFIG_PATH))) {
+  if (!(await exists(Dot.configPath))) {
     await write(defaultConfig, true);
   }
 
   try {
-    const content = await Deno.readTextFile(CONFIG_PATH);
+    const content = await Deno.readTextFile(Dot.configPath);
     const parsed = JSON.parse(content) as DotConfig;
     const merged = { ...defaultConfig, ...parsed };
     if (!merged.initialized && !options.safe) {
@@ -46,7 +41,7 @@ export const get = async (
     if (error instanceof Error) {
       if (error.message === "NOT_INITIALIZED") {
         const message =
-          "It seems like the first time your run the Dot CLI, please run: dot init";
+          `It seems like the first time your run the ${Dot.title}, please run: dot init`;
         console.error(message);
         Deno.exit(1);
       }
@@ -60,15 +55,15 @@ export const write = async (
   value: Partial<DotConfig>,
   init: boolean = false,
 ): Promise<void> => {
-  if (!(await exists(CONFIG_PATH))) {
-    await Deno.mkdir(CONFIG_DIR, { recursive: true });
-    await Deno.create(CONFIG_PATH);
+  if (!(await exists(Dot.configPath))) {
+    await Deno.mkdir(Dot.configDirectory, { recursive: true });
+    await Deno.create(Dot.configPath);
   }
 
   const config = init ? value : (await get());
   const merged = { ...config, ...value };
 
-  await Deno.writeTextFile(CONFIG_PATH, JSON.stringify(merged, null, 2));
+  await Deno.writeTextFile(Dot.configPath, JSON.stringify(merged, null, 2));
 };
 
 export const initialize = (

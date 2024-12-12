@@ -1,3 +1,4 @@
+import Dot from "../dot.ts";
 import { blue, bold } from "@std/fmt/colors";
 import { Command } from "@cliffy/command";
 import { Confirm } from "@cliffy/prompt";
@@ -10,7 +11,7 @@ import * as log from "../tools/logging.ts";
 export default new Command()
   .description("Initialize dot CLI with valid configuration.")
   .action(async () => {
-    log.info(blue("👋 Welcome to Dot CLI."));
+    log.info(blue(`👋 Welcome to ${Dot.title}.`));
     log.info(
       "👉 Setup the location of your dotfiles repository and the target location.\n",
     );
@@ -26,7 +27,7 @@ export default new Command()
       initialized: true,
     });
 
-    log.success("\n💪 Dot CLI initialized successfully!");
+    log.success(`\n💪 ${Dot.title} initialized successfully!`);
 
     await list.parse([]);
 
@@ -35,7 +36,7 @@ export default new Command()
     });
 
     if (!confirm) {
-      log.info("If you want to link your dotfiles later, run: dot link");
+      log.info(`If you want to link your dotfiles later, run: ${Dot.bin} link`);
       Deno.exit(0);
     }
 
