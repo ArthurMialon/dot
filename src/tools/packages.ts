@@ -98,20 +98,10 @@ export const linkPackage = async (
       file.directory,
       file.name,
     );
-
-    const linkRealPath = await getTargetLink(targetLinkPath);
-    const isValid = linkRealPath === file.fullPath;
-
-    if (!linkRealPath) {
-      await Deno.remove(targetLinkPath);
-      await Deno.mkdir(dirname(targetLinkPath), { recursive: true });
-      await Deno.symlink(file.fullPath, targetLinkPath);
-    }
-
-    if (!isValid) {
-      await Deno.remove(targetLinkPath);
-      await Deno.symlink(file.fullPath, targetLinkPath);
-    }
+    // Avoid throw if it's a symlink that doesn't point to valid file
+    await Deno.remove(targetLinkPath).catch(() => {})
+    await Deno.mkdir(dirname(targetLinkPath), { recursive: true });
+    await Deno.symlink(file.fullPath, targetLinkPath);
   }
 };
 
@@ -128,10 +118,6 @@ export const unlinkPackage = async (
       file.name,
     );
 
-    const linkRealPath = await getTargetLink(targetLinkPath);
-
-    if (linkRealPath) {
-      await Deno.remove(targetLinkPath);
-    }
+    await Deno.remove(targetLinkPath).catch(() => {});
   }
 };
