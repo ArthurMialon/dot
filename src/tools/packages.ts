@@ -1,6 +1,5 @@
 import type { DotConfig } from "./config.ts";
 import { dirname, join } from "@std/path";
-import { exists } from "@std/fs";
 import Dot from "../dot.ts";
 import { IgnoreFile } from "../tools/ignore.ts";
 
@@ -53,14 +52,6 @@ const listSourceFiles = async (
   return result;
 };
 
-const getTargetLink = async (
-  path: string,
-): Promise<string | null> => {
-  if (await exists(path)) return Deno.realPath(path);
-
-  return null;
-};
-
 const getPackage = async (
   path: string,
   name: string,
@@ -100,7 +91,7 @@ export const linkPackage = async (
     );
 
     // Avoid throw if it's a symlink that doesn't point to valid file
-    await Deno.remove(targetLinkPath).catch(() => {})
+    await Deno.remove(targetLinkPath).catch(() => {});
     await Deno.mkdir(dirname(targetLinkPath), { recursive: true });
     await Deno.symlink(file.fullPath, targetLinkPath);
   }
@@ -119,6 +110,6 @@ export const unlinkPackage = async (
       file.name,
     );
 
-    await Deno.remove(targetLinkPath).catch(() => {})
+    await Deno.remove(targetLinkPath).catch(() => {});
   }
 };

@@ -1,7 +1,7 @@
 import Dot from "../dot.ts";
 import { blue, bold } from "@std/fmt/colors";
 import { Command } from "@cliffy/command";
-import { Confirm, Input } from "@cliffy/prompt";
+import { Confirm } from "@cliffy/prompt";
 import list from "./list.ts";
 import link from "./link.ts";
 import configEditPrompt from "../prompt/config-edit.ts";
@@ -10,7 +10,7 @@ import * as log from "../tools/logging.ts";
 import * as git from "../tools/git.ts";
 
 export default new Command()
-  .description("Initialize dot CLI with valid configuration.")
+  .description(`Initialize ${Dot.title} with valid configuration.`)
   .arguments("[repository]")
   .action(async (_flags, remoteRepository) => {
     log.info(blue(`👋 Welcome to ${Dot.title}.`));

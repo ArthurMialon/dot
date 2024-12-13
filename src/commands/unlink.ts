@@ -21,7 +21,7 @@ export default new Command()
     const configuration = await config.get();
 
     const pkgs = await packages.list(configuration.repo)
-      .catch(() => [])
+      .catch(() => []);
 
     const filteredPkgs = pkgs
       .filter((pkg) => {

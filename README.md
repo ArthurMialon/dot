@@ -4,7 +4,6 @@
 [Cliffy](https://cliffy.io/) inspired by
 [GNU Stow](https://www.gnu.org/software/stow/)
 
-
 ## Table of Contents
 
 - [Demo](#demo)
@@ -19,6 +18,9 @@
   - [Config](#config)
   - [Add](#add)
   - [Edit](#edit)
+  - [Status](#status)
+  - [Push](#push)
+  - [Pull](#pull)
   - [Upgrade](#upgrade)
 - [Ignore](#ignore)
 
@@ -70,9 +72,8 @@ Examples of structure:
     └── .zshrc
 ```
 
-Dot CLI automatically symlinked all files to your `$HOME` directory
-(or any directory you want to target). It follows the structure inside each
-package.
+Dot CLI automatically symlinked all files to your `$HOME` directory (or any
+directory you want to target). It follows the structure inside each package.
 
 Example for the **ZSH** package:
 
@@ -126,7 +127,8 @@ Basic setup. Ask you to set locations to your dotfiles and the target location.
 dot init
 ```
 
-**With arguments:** You can clone your dotfiles repository and link all packages.
+**With arguments:** You can clone your dotfiles repository and link all
+packages.
 
 ```bash
 dot init git@github.com:ArthurMialon/dotfiles.git
@@ -248,6 +250,42 @@ dot edit
 **Aliases:**
 
 - `dot open`
+
+---
+
+### Status
+
+Check status of your dotfiles repository.
+
+**Basic:**
+
+```bash
+dot status
+```
+
+---
+
+### Push
+
+Push updates to your remote dotfiles repository.
+
+**Basic:**
+
+```bash
+dot push
+```
+
+---
+
+### Pull
+
+Pull updates from your remote dotfiles repository and link files.
+
+**Basic:**
+
+```bash
+dot pull
+```
 
 ---
 
