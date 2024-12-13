@@ -143,7 +143,7 @@ Link all packages to your `$HOME` directory (can be update with configuration).
 **Basic:**
 
 ```bash
-dot unlink
+dot link
 ```
 
 **Aliases:**
