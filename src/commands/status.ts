@@ -7,10 +7,17 @@ import * as git from "../tools/git.ts";
 export default new Command()
   .description("Check status of your dotfiles repository")
   .action(async () => {
-    const configuration = await config.get();
+    const { repo } = await config.get();
 
     log.info("Status of your dotfiles in:");
-    log.info(bold(configuration.repo), "\n");
+    log.info(bold(repo), "\n");
 
-    await git.status(configuration.repo);
+    const changes = await git.hasChange(repo);
+
+    if (!changes) {
+      log.info("No changes to commit");
+      Deno.exit(0);
+    }
+
+    await git.status(repo);
   });
