@@ -39,7 +39,8 @@ if ! echo "$PATH" | grep -q "$INSTALL_DIR"; then
     echo "Add $INSTALL_DIR to PATH"
     echo "export PATH=\$PATH:$INSTALL_DIR" >> "$HOME/.bashrc"
     echo "export PATH=\$PATH:$INSTALL_DIR" >> "$HOME/.zshrc"
-    export PATH=$PATH:$INSTALL_DIR
 fi
+
+export PATH=$PATH:$INSTALL_DIR
 
 echo "Dot CLI successfully installed in $INSTALL_DIR"
