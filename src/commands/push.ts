@@ -4,7 +4,7 @@ import { Command } from "@cliffy/command";
 import status from "./status.ts";
 import { bold } from "@std/fmt/colors";
 import * as git from "../tools/git.ts";
-import { Confirm } from "@cliffy/prompt";
+import { Confirm, Input } from "@cliffy/prompt";
 
 function toISODate(date: Date): string {
   return date.toISOString().split("T")[0];
@@ -31,10 +31,18 @@ export default new Command()
       Deno.exit(1);
     }
 
-    const date = toISODate(new Date());
-    const commit = `chore: updated on ${date} from Dot CLI`;
+    const prefix = "chore:";
+    const suffix = `${toISODate(new Date())} from Dot CLI`;
+    const info = await Input.prompt({
+      message: "Add information about changes (optional)",
+      default: "",
+    });
 
-    log.info("\nCommit message", bold(commit));
+    const commitMessage = info
+      ? `${prefix} ${info} - ${suffix}`
+      : `${prefix} ${suffix}`;
+
+    log.info("\nCommit message", bold(commitMessage));
 
     const confirm = await Confirm.prompt({
       message: `Do you want to commit and push the changes?`,
@@ -45,7 +53,7 @@ export default new Command()
       Deno.exit(0);
     }
 
-    await git.commit(repo, commit);
+    await git.commit(repo, commitMessage);
     await git.push(repo, branch);
 
     log.success("Dotfiles pushed to remote repository.");
