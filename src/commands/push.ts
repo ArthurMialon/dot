@@ -53,6 +53,7 @@ export default new Command()
       Deno.exit(0);
     }
 
+    await git.add(repo);
     await git.commit(repo, commitMessage);
     await git.push(repo, branch);
 

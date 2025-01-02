@@ -52,12 +52,29 @@ export const hasChange = async (
   return !!Number(status.trim().length);
 };
 
+export const add = async (
+  repository: string,
+): Promise<boolean> => {
+  const command = new Deno.Command("git", {
+    args: ["-C", repository, "add", "."],
+    stdout: "piped",
+    stderr: "piped",
+  }).spawn();
+
+  copy(readerFromStreamReader(command.stdout.getReader()), Deno.stdout);
+  copy(readerFromStreamReader(command.stderr.getReader()), Deno.stderr);
+
+  const { success } = await command.status;
+
+  return !!success;
+};
+
 export const commit = async (
   repository: string,
   message: string,
 ): Promise<boolean> => {
   const command = new Deno.Command("git", {
-    args: ["-C", repository, "commit", "-am", message],
+    args: ["-C", repository, "commit", "-m", message],
     stdout: "piped",
     stderr: "piped",
   }).spawn();
