@@ -6,7 +6,7 @@ export const clone = async (
   targetFolder: string,
 ): Promise<boolean> => {
   const command = new Deno.Command("git", {
-    args: ["command", repository, targetFolder],
+    args: ["clone", repository, targetFolder],
     stdout: "piped",
     stderr: "piped",
   }).spawn();
