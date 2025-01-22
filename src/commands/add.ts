@@ -74,12 +74,14 @@ export default new Command()
 
     const stat = await Deno.stat(requestedPath);
 
+    const target = join(
+      pkgPath,
+      relative(configuration.target, requestedPath),
+    );
+
     // In case of file we need to ensure the folder exists
     if (stat.isFile) {
-      const targetFolder = dirname(join(
-        pkgPath,
-        relative(configuration.target, requestedPath),
-      ));
+      const targetFolder = dirname(target);
 
       if (!(await exists(targetFolder))) {
         await Deno.mkdir(targetFolder, { recursive: true });
@@ -89,7 +91,7 @@ export default new Command()
     // Use `cp` to make sure we copy the content and not symlinks
     await copyWithCP(
       requestedPath,
-      join(pkgPath, dirname(relative(configuration.target, requestedPath))),
+      target,
     );
 
     await link.parse([
