@@ -32,7 +32,7 @@ curl -L "$DOWNLOAD_URL" -o "$INSTALL_DIR/$BINARY_NAME"
 # Make it exectuable
 chmod +x "$INSTALL_DIR/$BINARY_NAME"
 
-mkdir -R $HOME/.local/bin/dot
+mkdir -p $HOME/.local/bin/dot
 
 sudo ln -s "$INSTALL_DIR/$BINARY_NAME" "$HOME/.local/bin/dot"
 
