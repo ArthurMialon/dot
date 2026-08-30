@@ -15,7 +15,6 @@ import { pullCommand } from "./commands/pull";
 import { pushCommand } from "./commands/push";
 import { remoteCommand } from "./commands/remote";
 import { profileCommand } from "./commands/profile/index";
-import { completeCommand, completionCommand } from "./commands/completion";
 import { ManifestError } from "./tools/profiles";
 import * as log from "./tools/logging";
 import { dim } from "./tools/logging";
@@ -40,9 +39,7 @@ program
   .addCommand(pullCommand)
   .addCommand(pushCommand)
   .addCommand(remoteCommand)
-  .addCommand(profileCommand)
-  .addCommand(completionCommand)
-  .addCommand(completeCommand, { hidden: true });
+  .addCommand(profileCommand);
 
 /**
  * Matched by name rather than instanceof: a second copy of @inquirer/core in the

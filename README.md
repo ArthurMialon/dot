@@ -25,7 +25,6 @@
   - [Push](#push)
   - [Pull](#pull)
   - [Upgrade](#upgrade)
-  - [Completion](#completion)
 - [Ignore](#ignore-folder-and-files)
 - [Upgrading from 0.x](#upgrading-from-0x)
 - [Development](#development)
@@ -381,31 +380,6 @@ dot pull
 ```bash
 dot upgrade
 ```
-
----
-
-### Completion
-
-Shell completion for sub-commands, package names and profile names.
-
-```bash
-# zsh — add to ~/.zshrc
-eval "$(dot completion zsh)"
-
-# bash — add to ~/.bashrc
-eval "$(dot completion bash)"
-```
-
-```
-$ dot link <TAB>
-brew   docker   git   nvim   zsh
-
-$ dot profile use <TAB>
-macbook   macmini   raspberrypi
-```
-
-Package and profile names are read from your repository as you press Tab, so
-they stay current without regenerating anything.
 
 ---
 
