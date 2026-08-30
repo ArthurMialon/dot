@@ -35,15 +35,27 @@ export const runProfileShow = async (): Promise<void> => {
 
   const table = new Table({ head: ["Key", "Value"], style: { head: [] } });
 
+  const declared = manifest.profiles[profile.name];
+
   table.push(
     ["Profile", bold(profile.name)],
     ["Description", profile.description ?? "–"],
     ["Target", profile.target ?? configuration.target],
-    ["Packages", profile.packages.join("\n") || "–"],
+    [
+      "Includes",
+      profile.includesAll ? "* (all packages)" : declared.include.join("\n"),
+    ],
+    ["Excludes", declared.exclude.join("\n") || "–"],
+    ["Linked", profile.packages.join("\n") || "–"],
   );
 
   if (profile.missing.length) {
     table.push(["Missing", yellow(profile.missing.join("\n"))]);
+  }
+
+  // A typo here silently links what you meant to drop.
+  if (profile.staleExcludes.length) {
+    table.push(["Stale excludes", yellow(profile.staleExcludes.join("\n"))]);
   }
 
   log.info(table.toString());

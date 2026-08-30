@@ -29,5 +29,4 @@ export const runProfileList = async (): Promise<void> => {
   }
 
   log.info(table.toString());
-  log.info(`Common packages: ${manifest.common.join(", ") || "–"}`);
 };
