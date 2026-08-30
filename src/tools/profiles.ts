@@ -340,8 +340,48 @@ export const selectPackages = async (
   return { mode: "profile", names: profile.packages, profile, warnings };
 };
 
-const serialize = (manifest: DotManifest): string =>
-  `${JSON.stringify(manifest, null, 2)}\n`;
+const inlineArray = (values: string[]): string =>
+  `[${values.map((value) => JSON.stringify(value)).join(", ")}]`;
+
+/**
+ * Keeps package arrays on one line. JSON.stringify would put every package on
+ * its own line, so the first write-back would reformat the whole manifest and
+ * adding one package would not read as a one-line diff.
+ */
+const serialize = (manifest: DotManifest): string => {
+  const entries = Object.entries(manifest.profiles);
+
+  const profiles = entries.map(([name, profile], index) => {
+    const fields: string[] = [];
+
+    if (profile.description !== undefined) {
+      fields.push(
+        `      "description": ${JSON.stringify(profile.description)}`,
+      );
+    }
+
+    if (profile.target !== undefined) {
+      fields.push(`      "target": ${JSON.stringify(profile.target)}`);
+    }
+
+    fields.push(`      "packages": ${inlineArray(profile.packages)}`);
+
+    const comma = index === entries.length - 1 ? "" : ",";
+
+    return `    ${JSON.stringify(name)}: {\n${fields.join(",\n")}\n    }${comma}`;
+  });
+
+  return [
+    "{",
+    `  "version": ${manifest.version},`,
+    `  "common": ${inlineArray(manifest.common)},`,
+    '  "profiles": {',
+    ...profiles,
+    "  }",
+    "}",
+    "",
+  ].join("\n");
+};
 
 const assertNoComments = async (repo: string): Promise<void> => {
   const path = manifestPath(repo);
