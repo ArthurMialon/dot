@@ -1,12 +1,15 @@
 import { realpath } from "node:fs/promises";
 import { Command } from "commander";
-import { confirm } from "../tools/prompt";
+import { confirm, select, isInteractive } from "../tools/prompt";
 import Dot from "../dot";
 import * as config from "../tools/config";
 import * as log from "../tools/logging";
 import { blue, bold } from "../tools/logging";
 import * as git from "../tools/git";
 import { exists } from "../tools/fs";
+import { loadManifest, resolveProfile, resolveTarget } from "../tools/profiles";
+import * as packages from "../tools/packages";
+import { hostname } from "node:os";
 import configEditPrompt from "../prompt/config-edit";
 import { runList } from "./list";
 import { runLink } from "./link";
@@ -14,7 +17,65 @@ import { runLink } from "./link";
 export interface InitOptions {
   path?: string;
   branch?: string;
+  profile?: string;
+  target?: string;
+  yes?: boolean;
 }
+
+/** Normalise a hostname so "Arthurs-MacBook-Pro.local" matches "macbook". */
+const normalizeHost = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/\.(local|lan)$/, "")
+    .split(".")[0]
+    .replace(/[^a-z0-9]/g, "");
+
+/**
+ * Profile choice is always explicit: macbook and macmini are both darwin, so
+ * only the hostname discriminates, and hostnames change. It preselects the
+ * likely answer but never applies one silently.
+ */
+const chooseProfile = async (
+  repo: string,
+  options: InitOptions,
+): Promise<{ profile: string; target?: string } | null> => {
+  const manifest = await loadManifest(repo);
+
+  if (!manifest) return null;
+
+  const names = Object.keys(manifest.profiles);
+
+  if (names.length === 0) return null;
+
+  const onDisk = await packages.listPackageNames(repo);
+
+  if (options.profile) {
+    const resolved = resolveProfile(manifest, options.profile, onDisk);
+    return { profile: resolved.name, target: resolved.target };
+  }
+
+  if (!isInteractive()) return null;
+
+  const host = normalizeHost(hostname());
+  const match = names.find(
+    (name) => host.includes(name.toLowerCase()) || name.toLowerCase() === host,
+  );
+
+  const chosen = await select({
+    message: "Which profile is this machine?",
+    choices: names.map((name) => ({
+      name: match === name ? `${name} (matches this hostname)` : name,
+      value: name,
+      description: manifest.profiles[name].description,
+    })),
+    default: match,
+  });
+
+  return {
+    profile: chosen,
+    target: resolveTarget(manifest.profiles[chosen]),
+  };
+};
 
 export const runInit = async (
   remoteRepository: string | undefined,
@@ -34,11 +95,13 @@ export const runInit = async (
     log.info("Remote repository", bold(remoteRepository));
     log.info("Cloning into", bold(destination));
 
-    const confirmClone = await confirm({
-      message: "Clone it as your dotfiles repository?",
-      default: false,
-      hint: "Re-run with --yes to accept the defaults.",
-    });
+    const confirmClone =
+      options.yes ||
+      (await confirm({
+        message: "Clone it as your dotfiles repository?",
+        default: false,
+        hint: "Re-run with --yes to accept the defaults.",
+      }));
 
     if (!confirmClone) {
       log.info("Aborted");
@@ -71,7 +134,23 @@ export const runInit = async (
     configuration.repo = await realpath(destination);
   }
 
-  const configPrompt = await configEditPrompt(configuration);
+  const chosen = await chooseProfile(configuration.repo, options);
+
+  if (chosen) {
+    log.info("Profile:", bold(chosen.profile));
+
+    if (chosen.target) {
+      log.info("Profile target:", bold(chosen.target));
+      configuration.target = chosen.target;
+    }
+  }
+
+  if (options.target) configuration.target = options.target;
+
+  const configPrompt =
+    options.yes || !isInteractive()
+      ? { target: configuration.target, repo: configuration.repo }
+      : await configEditPrompt(configuration);
 
   const remote = await git.getRemoteUrl(configPrompt.repo);
   const currentBranch = await git.getCurrentBranch(configPrompt.repo);
@@ -83,6 +162,7 @@ export const runInit = async (
     initialized: true,
     remote,
     branch,
+    profile: chosen?.profile ?? null,
   });
 
   if (remote) log.info("Remote:", bold(remote));
@@ -92,11 +172,13 @@ export const runInit = async (
 
   await runList();
 
-  const confirmed = await confirm({
-    message: "Do you want to link your dotfiles?",
-    default: false,
-    hint: "Re-run with --yes to link without asking.",
-  });
+  const confirmed =
+    options.yes ||
+    (await confirm({
+      message: "Do you want to link your dotfiles?",
+      default: false,
+      hint: "Re-run with --yes to link without asking.",
+    }));
 
   if (!confirmed) {
     log.success(`Link your dotfiles later, with: ${Dot.bin} link`);
@@ -138,6 +220,10 @@ export const initCommand = new Command("init")
   .description(`Initialize ${Dot.title} with valid configuration.`)
   .argument("[repository]", "Remote repository to clone")
   .option("--path <dir>", `Clone destination (default: ${Dot.defaultRepo})`)
+  .option("-b, --branch <name>", "Branch to clone and record")
+  .option("-p, --profile <name>", "Profile to activate, skipping the prompt")
+  .option("-t, --target <path>", "Symlink target, skipping the prompt")
+  .option("-y, --yes", "Accept the defaults without prompting", false)
   .action((repository: string | undefined, options: InitOptions) =>
     runInit(repository, options),
   );

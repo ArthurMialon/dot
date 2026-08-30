@@ -14,6 +14,7 @@ interface DotCLI {
   defaultRepo: string;
   defaultTarget: string;
   ignoreFileName: string;
+  manifestFileName: string;
   installScript: string;
 }
 
@@ -47,6 +48,7 @@ const Dot: DotCLI = {
   defaultRepo: DEFAULT_REPO,
   defaultTarget: DEFAULT_TARGET,
   ignoreFileName: ".dotignore",
+  manifestFileName: "dot.json",
 };
 
 export default Dot;

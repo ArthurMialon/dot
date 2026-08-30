@@ -126,3 +126,152 @@ describe("non-interactive safety", () => {
     expect(await Bun.file(join(home, ".zshrc")).text()).toBe("export ZSH=1\n");
   });
 });
+
+/** A HOME whose dotfiles repository declares three machine profiles. */
+const profiledHome = async (activeProfile?: string): Promise<string> => {
+  const home = await mkdtemp(join(tmpdir(), "dot-cli-profile-"));
+  const repo = join(home, "dotfiles");
+
+  for (const pkg of ["git", "zsh", "brew", "docker"]) {
+    await mkdir(join(repo, pkg), { recursive: true });
+    await writeFile(join(repo, pkg, `.${pkg}rc`), `${pkg}\n`);
+  }
+
+  await writeFile(
+    join(repo, "dot.json"),
+    JSON.stringify(
+      {
+        version: 1,
+        common: ["git", "zsh"],
+        profiles: {
+          macbook: { packages: ["brew"] },
+          raspberrypi: { packages: ["docker"] },
+        },
+      },
+      null,
+      2,
+    ),
+  );
+
+  await mkdir(join(home, ".dot"), { recursive: true });
+  await writeFile(
+    join(home, ".dot", "config"),
+    JSON.stringify({
+      initialized: true,
+      repo,
+      target: home,
+      configPath: join(home, ".dot", "config"),
+      configDirectory: join(home, ".dot"),
+      ...(activeProfile ? { profile: activeProfile } : {}),
+    }),
+  );
+
+  return home;
+};
+
+const linked = async (home: string, name: string): Promise<boolean> =>
+  Bun.file(join(home, name)).exists();
+
+describe("profiles", () => {
+  test("links only the packages of the active profile", async () => {
+    const home = await profiledHome("raspberrypi");
+
+    const { code } = await runCli(["link", "-f"], home);
+
+    expect(code).toBe(0);
+    expect(await linked(home, ".gitrc")).toBe(true);
+    expect(await linked(home, ".zshrc")).toBe(true);
+    expect(await linked(home, ".dockerrc")).toBe(true);
+    expect(await linked(home, ".brewrc")).toBe(false);
+  });
+
+  test("switching profiles removes the links left by the previous one", async () => {
+    const home = await profiledHome();
+
+    await runCli(["profile", "use", "macbook", "-f"], home);
+    expect(await linked(home, ".brewrc")).toBe(true);
+
+    await runCli(["profile", "use", "raspberrypi", "-f"], home);
+
+    expect(await linked(home, ".brewrc")).toBe(false);
+    expect(await linked(home, ".dockerrc")).toBe(true);
+    expect(await linked(home, ".gitrc")).toBe(true);
+  });
+
+  test("--dry-run changes nothing", async () => {
+    const home = await profiledHome("macbook");
+
+    const { stdout } = await runCli(
+      ["profile", "use", "raspberrypi", "--dry-run"],
+      home,
+    );
+
+    expect(stdout).toContain("Dry run");
+    expect(await linked(home, ".dockerrc")).toBe(false);
+  });
+
+  // Out-of-profile and non-existent are different problems; the old code
+  // reported both as "No package to link".
+  test("refuses a package outside the profile, and says how to proceed", async () => {
+    const home = await profiledHome("raspberrypi");
+
+    const { code, stdout } = await runCli(["link", "brew", "-f"], home);
+
+    expect(code).toBe(1);
+    expect(stdout).toContain("not part of profile");
+    expect(stdout).toContain("--all");
+  });
+
+  test("--all links a package outside the profile", async () => {
+    const home = await profiledHome("raspberrypi");
+
+    const { code } = await runCli(["link", "brew", "--all", "-f"], home);
+
+    expect(code).toBe(0);
+    expect(await linked(home, ".brewrc")).toBe(true);
+  });
+
+  test("reports a package that does not exist at all", async () => {
+    const home = await profiledHome("raspberrypi");
+
+    const { code, stdout } = await runCli(["link", "nope", "-f"], home);
+
+    expect(code).toBe(1);
+    expect(stdout).toContain("does not exist");
+  });
+
+  test("suggests a close profile name", async () => {
+    const home = await profiledHome();
+
+    const { code, stdout } = await runCli(
+      ["profile", "use", "raspberypi", "-f"],
+      home,
+    );
+
+    expect(code).toBe(1);
+    expect(stdout).toContain('Did you mean "raspberrypi"');
+  });
+
+  // Every repository without a dot.json must behave exactly as before.
+  test("a repository with no dot.json links everything", async () => {
+    const home = await initializedHome();
+
+    const { code, stdout } = await runCli(["link", "-f"], home);
+
+    expect(code).toBe(0);
+    expect(stdout).not.toContain("Profile:");
+    expect(await linked(home, ".zshrc")).toBe(true);
+  });
+
+  test("--profile on a repository without dot.json explains why", async () => {
+    const home = await initializedHome();
+
+    const { code, stdout } = await runCli(
+      ["link", "--profile", "macbook", "-f"],
+      home,
+    );
+
+    expect(code).toBe(1);
+    expect(stdout).toContain("profiles are not configured");
+  });
+});

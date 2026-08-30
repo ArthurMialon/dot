@@ -83,10 +83,8 @@ const getPackage = async (path: string, name: string): Promise<DotPackage> => {
   };
 };
 
-export const list = async (
-  path: string,
-  filter?: { names: string[] | null },
-): Promise<DotPackage[]> => {
+/** Package directory names, without walking their contents. */
+export const listPackageNames = async (path: string): Promise<string[]> => {
   const ignoreFile = getIgnoreFile(join(path, Dot.ignoreFileName));
 
   const names: string[] = [];
@@ -97,6 +95,15 @@ export const list = async (
 
     names.push(dirEntry.name);
   }
+
+  return names;
+};
+
+export const list = async (
+  path: string,
+  filter?: { names: string[] | null },
+): Promise<DotPackage[]> => {
+  const names = await listPackageNames(path);
 
   // When a filter is given, honour its order so linking is deterministic and
   // identical across machines instead of depending on the filesystem.
