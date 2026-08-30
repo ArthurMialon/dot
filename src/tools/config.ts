@@ -1,5 +1,6 @@
-import { exists } from "@std/fs";
-import Dot from "../dot.ts";
+import { mkdir } from "node:fs/promises";
+import Dot from "../dot";
+import { exists } from "./fs";
 
 export interface DotConfig {
   configPath: string;
@@ -28,27 +29,24 @@ export const get = async (
     await write(defaultConfig, true);
   }
 
+  let merged: DotConfig;
+
   try {
-    const content = await Deno.readTextFile(Dot.configPath);
-    const parsed = JSON.parse(content) as DotConfig;
-    const merged = { ...defaultConfig, ...parsed };
-    if (!merged.initialized && !options.safe) {
-      throw new Error("NOT_INITIALIZED");
-    }
-
-    return merged;
-  } catch (error) {
-    if (error instanceof Error) {
-      if (error.message === "NOT_INITIALIZED") {
-        const message =
-          `It seems like the first time your run the ${Dot.title}, please run: dot init`;
-        console.error(message);
-        Deno.exit(1);
-      }
-    }
-
+    const content = await Bun.file(Dot.configPath).text();
+    const parsed = JSON.parse(content) as Partial<DotConfig>;
+    merged = { ...defaultConfig, ...parsed };
+  } catch {
     throw new Error("Cannot read configuration");
   }
+
+  if (!merged.initialized && !options.safe) {
+    console.error(
+      `It seems like the first time your run the ${Dot.title}, please run: dot init`,
+    );
+    process.exit(1);
+  }
+
+  return merged;
 };
 
 export const write = async (
@@ -56,24 +54,13 @@ export const write = async (
   init: boolean = false,
 ): Promise<void> => {
   if (!(await exists(Dot.configPath))) {
-    await Deno.mkdir(Dot.configDirectory, { recursive: true });
-    await Deno.create(Dot.configPath);
+    await mkdir(Dot.configDirectory, { recursive: true });
   }
 
-  const config = init ? value : (await get());
+  const config = init ? value : await get();
   const merged = { ...config, ...value };
 
-  await Deno.writeTextFile(Dot.configPath, JSON.stringify(merged, null, 2));
+  await Bun.write(Dot.configPath, JSON.stringify(merged, null, 2));
 };
 
-export const initialize = (
-  value: Partial<DotConfig>,
-) => write(value, true);
-
-export const update = async <K extends keyof DotConfig>(
-  key: K,
-  value: DotConfig[K],
-): Promise<DotConfig> => {
-  const updated = { ...await get(), [key]: value };
-  return updated;
-};
+export const initialize = (value: Partial<DotConfig>) => write(value, true);

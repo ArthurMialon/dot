@@ -1,0 +1,31 @@
+{
+  "name": "dot",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Easily manage your dotfiles.",
+  "scripts": {
+    "dev": "bun run ./src/main.ts",
+    "build": "bun build ./src/main.ts --compile --sourcemap --target=$COMPILE_TARGET --outfile build/$COMPILE_NAME",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^8.7.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^15.0.0",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/bun": "^1.4.0",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.6",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.68.0"
+  }
+}

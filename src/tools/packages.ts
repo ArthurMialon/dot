@@ -1,10 +1,20 @@
-import type { DotConfig } from "./config.ts";
-import { dirname, join } from "@std/path";
-import Dot from "../dot.ts";
-import { IgnoreFile } from "../tools/ignore.ts";
+import {
+  lstat,
+  mkdir,
+  readdir,
+  readlink,
+  symlink,
+  unlink,
+} from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import type { DotConfig } from "./config";
+import Dot from "../dot";
+import { getIgnoreFile, type IgnoreFile } from "./ignore";
 
-interface SourceFile extends Deno.DirEntry {
-  // targeted directory
+export interface SourceFile {
+  // file name
+  name: string;
+  // targeted directory, relative to the package root
   directory: string;
   // package name
   package: string;
@@ -12,69 +22,113 @@ interface SourceFile extends Deno.DirEntry {
   fullPath: string;
 }
 
-interface DotPackage {
+export interface DotPackage {
   name: string;
   files: SourceFile[];
 }
+
+export type UnlinkOutcome =
+  "removed" | "absent" | "skipped-not-symlink" | "skipped-foreign";
+
+export interface UnlinkReport {
+  file: SourceFile;
+  target: string;
+  outcome: UnlinkOutcome;
+}
+
+/** The path a source file is linked to inside the target directory. */
+export const targetPathFor = (target: string, file: SourceFile): string =>
+  join(target, file.directory, file.name);
 
 const listSourceFiles = async (
   path: string,
   folder: string = "",
   subFolder: string = "",
+  ignoreFile: IgnoreFile = getIgnoreFile(join(path, Dot.ignoreFileName)),
 ): Promise<SourceFile[]> => {
-  const ignoreFile = new IgnoreFile(join(path, Dot.ignoreFileName));
   const result: SourceFile[] = [];
   const packagePath = join(path, folder);
   const fullPath = join(packagePath, subFolder);
 
-  for await (const dirEntry of Deno.readDir(fullPath)) {
-    if (dirEntry.isFile) {
-      if (await ignoreFile.ignore(dirEntry.name)) continue;
+  for (const dirEntry of await readdir(fullPath, { withFileTypes: true })) {
+    if (await ignoreFile.ignore(dirEntry.name)) continue;
 
-      result.push({
-        ...dirEntry,
-        directory: subFolder,
-        package: folder,
-        fullPath: join(fullPath, dirEntry.name),
-      });
-    } else {
-      if (await ignoreFile.ignore(dirEntry.name)) continue;
-
-      const sub = await listSourceFiles(
-        path,
-        folder,
-        join(subFolder, dirEntry.name),
+    if (dirEntry.isDirectory()) {
+      result.push(
+        ...(await listSourceFiles(
+          path,
+          folder,
+          join(subFolder, dirEntry.name),
+          ignoreFile,
+        )),
       );
-      result.push(...sub);
+      continue;
     }
+
+    result.push({
+      name: dirEntry.name,
+      directory: subFolder,
+      package: folder,
+      fullPath: join(fullPath, dirEntry.name),
+    });
   }
 
   return result;
 };
 
-const getPackage = async (
-  path: string,
-  name: string,
-): Promise<DotPackage> => {
+const getPackage = async (path: string, name: string): Promise<DotPackage> => {
   return {
     name,
     files: await listSourceFiles(path, name),
   };
 };
 
-export const list = async (path: string) => {
-  const ignoreFile = new IgnoreFile(join(path, Dot.ignoreFileName));
+export const list = async (
+  path: string,
+  filter?: { names: string[] | null },
+): Promise<DotPackage[]> => {
+  const ignoreFile = getIgnoreFile(join(path, Dot.ignoreFileName));
+
+  const names: string[] = [];
+
+  for (const dirEntry of await readdir(path, { withFileTypes: true })) {
+    if (!dirEntry.isDirectory()) continue;
+    if (await ignoreFile.ignore(dirEntry.name)) continue;
+
+    names.push(dirEntry.name);
+  }
+
+  // When a filter is given, honour its order so linking is deterministic and
+  // identical across machines instead of depending on the filesystem.
+  const selected = filter?.names
+    ? filter.names.filter((name) => names.includes(name))
+    : names;
 
   const dotPackages: DotPackage[] = [];
 
-  for await (const dirEntry of Deno.readDir(path)) {
-    if (dirEntry.isFile) continue;
-    if (await ignoreFile.ignore(dirEntry.name)) continue;
-
-    dotPackages.push(await getPackage(path, dirEntry.name));
+  for (const name of selected) {
+    dotPackages.push(await getPackage(path, name));
   }
 
   return dotPackages;
+};
+
+/** True when `target` is a symlink resolving to `expectedSource`. */
+const isManagedLink = async (
+  target: string,
+  expectedSource: string,
+): Promise<boolean> => {
+  try {
+    const stats = await lstat(target);
+
+    if (!stats.isSymbolicLink()) return false;
+
+    const destination = await readlink(target);
+
+    return resolve(dirname(target), destination) === resolve(expectedSource);
+  } catch {
+    return false;
+  }
 };
 
 export const linkPackage = async (
@@ -83,33 +137,62 @@ export const linkPackage = async (
 ): Promise<void> => {
   const files = await listSourceFiles(config.repo, dotPackage.name);
 
-  for await (const file of files) {
-    const targetLinkPath = join(
-      config.target,
-      file.directory,
-      file.name,
-    );
+  for (const file of files) {
+    const targetLinkPath = targetPathFor(config.target, file);
 
-    // Avoid throw if it's a symlink that doesn't point to valid file
-    await Deno.remove(targetLinkPath).catch(() => {});
-    await Deno.mkdir(dirname(targetLinkPath), { recursive: true });
-    await Deno.symlink(file.fullPath, targetLinkPath);
+    // Avoid throwing on a symlink that points at a missing file.
+    await unlink(targetLinkPath).catch(() => {});
+    await mkdir(dirname(targetLinkPath), { recursive: true });
+    await symlink(file.fullPath, targetLinkPath);
   }
 };
 
+/**
+ * Only removes symlinks this package owns. The previous implementation removed
+ * whatever sat at the target path, so a real ~/.zshrc was destroyed by
+ * `dot unlink zsh`.
+ */
 export const unlinkPackage = async (
   config: DotConfig,
   dotPackage: DotPackage,
-): Promise<void> => {
+): Promise<UnlinkReport[]> => {
   const files = await listSourceFiles(config.repo, dotPackage.name);
 
-  for await (const file of files) {
-    const targetLinkPath = join(
-      config.target,
-      file.directory,
-      file.name,
-    );
+  const reports: UnlinkReport[] = [];
 
-    await Deno.remove(targetLinkPath).catch(() => {});
+  for (const file of files) {
+    const target = targetPathFor(config.target, file);
+
+    reports.push({
+      file,
+      target,
+      outcome: await removeManagedLink(target, file.fullPath),
+    });
+  }
+
+  return reports;
+};
+
+const removeManagedLink = async (
+  target: string,
+  source: string,
+): Promise<UnlinkOutcome> => {
+  let stats;
+
+  try {
+    stats = await lstat(target);
+  } catch {
+    return "absent";
+  }
+
+  if (!stats.isSymbolicLink()) return "skipped-not-symlink";
+
+  if (!(await isManagedLink(target, source))) return "skipped-foreign";
+
+  try {
+    await unlink(target);
+    return "removed";
+  } catch {
+    return "absent";
   }
 };

@@ -1,61 +1,63 @@
-import * as log from "../tools/logging.ts";
-import * as config from "../tools/config.ts";
-import { Command } from "@cliffy/command";
-import status from "./status.ts";
-import { bold } from "@std/fmt/colors";
-import * as git from "../tools/git.ts";
-import { Confirm, Input } from "@cliffy/prompt";
+import { Command } from "commander";
+import { confirm, input } from "@inquirer/prompts";
+import * as config from "../tools/config";
+import * as log from "../tools/logging";
+import { bold } from "../tools/logging";
+import * as git from "../tools/git";
+import { runStatus } from "./status";
 
-function toISODate(date: Date): string {
-  return date.toISOString().split("T")[0];
-}
+const toISODate = (date: Date): string => date.toISOString().split("T")[0];
 
-export default new Command()
-  .description("Publish new version of your dotfiles")
-  .action(async () => {
-    const { repo } = await config.get();
+export const runPush = async (): Promise<void> => {
+  const { repo } = await config.get();
 
-    await status.parse([]);
+  const changes = await runStatus({ exitWhenClean: false });
 
-    const changes = await git.hasChange(repo);
+  if (!changes) {
+    log.info("No changes to push");
+    return;
+  }
 
-    if (!changes) {
-      log.info("No changes to push");
-      Deno.exit(0);
-    }
+  const branch = await git.getCurrentBranch(repo);
 
-    const branch = await git.getCurrentBranch(repo);
+  if (!branch) {
+    log.error("Cannot read current branch of repository", bold(repo));
+    process.exit(1);
+  }
 
-    if (!branch) {
-      log.error("Cannot read current branch of repository", bold(repo));
-      Deno.exit(1);
-    }
+  const prefix = "chore:";
+  const suffix = `${toISODate(new Date())} from Dot CLI`;
 
-    const prefix = "chore:";
-    const suffix = `${toISODate(new Date())} from Dot CLI`;
-    const info = await Input.prompt({
-      message: "Add information about changes (optional)",
-      default: "",
-    });
-
-    const commitMessage = info
-      ? `${prefix} ${info} - ${suffix}`
-      : `${prefix} ${suffix}`;
-
-    log.info("\nCommit message", bold(commitMessage));
-
-    const confirm = await Confirm.prompt({
-      message: `Do you want to commit and push the changes?`,
-    });
-
-    if (!confirm) {
-      log.info("Commit aborted");
-      Deno.exit(0);
-    }
-
-    await git.add(repo);
-    await git.commit(repo, commitMessage);
-    await git.push(repo, branch);
-
-    log.success("Dotfiles pushed to remote repository.");
+  const info = await input({
+    message: "Add information about changes (optional)",
+    default: "",
   });
+
+  const commitMessage = info
+    ? `${prefix} ${info} - ${suffix}`
+    : `${prefix} ${suffix}`;
+
+  log.info("\nCommit message", bold(commitMessage));
+
+  const confirmed = await confirm({
+    message: "Do you want to commit and push the changes?",
+    default: false,
+  });
+
+  if (!confirmed) {
+    log.info("Commit aborted");
+    return;
+  }
+
+  await git.add(repo);
+  await git.commit(repo, commitMessage);
+  await git.push(repo, branch);
+
+  log.success("Dotfiles pushed to remote repository.");
+};
+
+export const pushCommand = new Command("push")
+  .description("Publish new version of your dotfiles")
+  .action(runPush);
+
+export default pushCommand;

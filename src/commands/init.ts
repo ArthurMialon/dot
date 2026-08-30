@@ -1,80 +1,95 @@
-import Dot from "../dot.ts";
-import { blue, bold } from "@std/fmt/colors";
-import { Command } from "@cliffy/command";
-import { Confirm } from "@cliffy/prompt";
-import list from "./list.ts";
-import link from "./link.ts";
-import configEditPrompt from "../prompt/config-edit.ts";
-import * as config from "../tools/config.ts";
-import * as log from "../tools/logging.ts";
-import * as git from "../tools/git.ts";
+import { realpath } from "node:fs/promises";
+import { Command } from "commander";
+import { confirm } from "@inquirer/prompts";
+import Dot from "../dot";
+import * as config from "../tools/config";
+import * as log from "../tools/logging";
+import { blue, bold } from "../tools/logging";
+import * as git from "../tools/git";
+import configEditPrompt from "../prompt/config-edit";
+import { runList } from "./list";
+import { runLink } from "./link";
 
-export default new Command()
-  .description(`Initialize ${Dot.title} with valid configuration.`)
-  .arguments("[repository]")
-  .action(async (_flags, remoteRepository) => {
-    log.info(blue(`👋 Welcome to ${Dot.title}.`));
-    log.info(
-      "👉 Setup starts with location of your dotfiles repository and the target location.\n",
-    );
+export interface InitOptions {
+  path?: string;
+}
 
-    if (remoteRepository) {
-      log.info("Remote repository", bold(remoteRepository));
-      const confirmClone = await Confirm.prompt({
-        message: `Clone it as your dotfiles repository?`,
-      });
+export const runInit = async (
+  remoteRepository: string | undefined,
+  options: InitOptions = {},
+): Promise<void> => {
+  log.info(blue(`👋 Welcome to ${Dot.title}.`));
+  log.info(
+    "👉 Setup starts with location of your dotfiles repository and the target location.\n",
+  );
 
-      if (!confirmClone) {
-        log.info(`Aborted`);
-        Deno.exit(0);
-      }
+  // Avoid throwing if the config is not initialized yet
+  const configuration = await config.get({ safe: true });
 
-      const cloned = await git.clone(remoteRepository, "dotfiles");
+  if (remoteRepository) {
+    const destination = options.path ?? Dot.defaultRepo;
 
-      if (!cloned) {
-        log.error(`Failed to clone repository ${remoteRepository}`);
-        Deno.exit(1);
-      }
-    }
+    log.info("Remote repository", bold(remoteRepository));
+    log.info("Cloning into", bold(destination));
 
-    // Avoid throw if config not yet initialized
-    const configuration = await config.get({ safe: true });
-
-    configuration.repo = remoteRepository
-      ? (await Deno.realPath("./dotfiles"))
-      : configuration.repo;
-
-    const configPrompt = await configEditPrompt(configuration);
-
-    await config.initialize({
-      target: configPrompt.target,
-      repo: configPrompt.repo,
-      initialized: true,
+    const confirmClone = await confirm({
+      message: "Clone it as your dotfiles repository?",
+      default: false,
     });
 
-    log.success(`\n💪 ${Dot.title} initialized successfully!`);
-
-    await list.parse([]);
-
-    const confirm = await Confirm.prompt({
-      message: "Do you want to link your dotfiles?",
-    });
-
-    if (!confirm) {
-      log.success(
-        `Link your dotfiles later, with: ${Dot.bin} link`,
-      );
-      Deno.exit(0);
+    if (!confirmClone) {
+      log.info("Aborted");
+      return;
     }
 
-    await link.parse([
-      "-f",
-    ]);
+    const cloned = await git.clone(remoteRepository, destination);
 
-    const configurationReady = await config.get();
+    if (!cloned) {
+      log.error(`Failed to clone repository ${remoteRepository}`);
+      process.exit(1);
+    }
 
-    log.success(
-      "\nYour dotfiles are now linked to your target",
-      bold(configurationReady.target),
-    );
+    configuration.repo = await realpath(destination);
+  }
+
+  const configPrompt = await configEditPrompt(configuration);
+
+  await config.initialize({
+    target: configPrompt.target,
+    repo: configPrompt.repo,
+    initialized: true,
   });
+
+  log.success(`\n💪 ${Dot.title} initialized successfully!`);
+
+  await runList();
+
+  const confirmed = await confirm({
+    message: "Do you want to link your dotfiles?",
+    default: false,
+  });
+
+  if (!confirmed) {
+    log.success(`Link your dotfiles later, with: ${Dot.bin} link`);
+    return;
+  }
+
+  await runLink({ force: true });
+
+  const configurationReady = await config.get();
+
+  log.success(
+    "\nYour dotfiles are now linked to your target",
+    bold(configurationReady.target),
+  );
+};
+
+export const initCommand = new Command("init")
+  .description(`Initialize ${Dot.title} with valid configuration.`)
+  .argument("[repository]", "Remote repository to clone")
+  .option("--path <dir>", `Clone destination (default: ${Dot.defaultRepo})`)
+  .action((repository: string | undefined, options: InitOptions) =>
+    runInit(repository, options),
+  );
+
+export default initCommand;

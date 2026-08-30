@@ -1,138 +1,77 @@
-import { copy, readerFromStreamReader } from "@std/io";
-import * as log from "../tools/logging.ts";
+import { capture, exec } from "./process";
+
+const git = (repository: string, ...args: string[]): string[] => [
+  "git",
+  "-C",
+  repository,
+  ...args,
+];
 
 export const clone = async (
   repository: string,
   targetFolder: string,
+  branch?: string,
 ): Promise<boolean> => {
-  const command = new Deno.Command("git", {
-    args: ["clone", repository, targetFolder],
-    stdout: "piped",
-    stderr: "piped",
-  }).spawn();
+  const args = ["git", "clone"];
 
-  copy(readerFromStreamReader(command.stdout.getReader()), Deno.stdout);
-  copy(readerFromStreamReader(command.stderr.getReader()), Deno.stderr);
+  if (branch) args.push("--branch", branch);
 
-  const { success } = await command.status;
+  args.push(repository, targetFolder);
 
-  return !!success;
+  const { ok } = await exec(args);
+
+  return ok;
 };
 
-const statusCommand = (repository: string) => {
-  return new Deno.Command("git", {
-    args: ["-C", repository, "status", "--short"],
-    stdout: "piped",
-    stderr: "piped",
-  }).spawn();
+export const status = async (repository: string): Promise<boolean> => {
+  const { ok } = await exec(git(repository, "status", "--short"));
+
+  return ok;
 };
 
-export const status = async (
-  repository: string,
-): Promise<boolean> => {
-  const command = statusCommand(repository);
+export const hasChange = async (repository: string): Promise<boolean> => {
+  const { stdout } = await capture(git(repository, "status", "--short"));
 
-  copy(readerFromStreamReader(command.stdout.getReader()), Deno.stdout);
-  copy(readerFromStreamReader(command.stderr.getReader()), Deno.stderr);
-
-  const { success } = await command.status;
-
-  return !!success;
+  return stdout.trim().length > 0;
 };
 
-export const hasChange = async (
-  repository: string,
-): Promise<boolean> => {
-  const command = statusCommand(repository);
+export const add = async (repository: string): Promise<boolean> => {
+  const { ok } = await exec(git(repository, "add", "."));
 
-  const output = await command.output();
-
-  const status = new TextDecoder().decode(output.stdout);
-
-  return !!Number(status.trim().length);
-};
-
-export const add = async (
-  repository: string,
-): Promise<boolean> => {
-  const command = new Deno.Command("git", {
-    args: ["-C", repository, "add", "."],
-    stdout: "piped",
-    stderr: "piped",
-  }).spawn();
-
-  copy(readerFromStreamReader(command.stdout.getReader()), Deno.stdout);
-  copy(readerFromStreamReader(command.stderr.getReader()), Deno.stderr);
-
-  const { success } = await command.status;
-
-  return !!success;
+  return ok;
 };
 
 export const commit = async (
   repository: string,
   message: string,
 ): Promise<boolean> => {
-  const command = new Deno.Command("git", {
-    args: ["-C", repository, "commit", "-m", message],
-    stdout: "piped",
-    stderr: "piped",
-  }).spawn();
+  const { ok } = await exec(git(repository, "commit", "-m", message));
 
-  copy(readerFromStreamReader(command.stdout.getReader()), Deno.stdout);
-  copy(readerFromStreamReader(command.stderr.getReader()), Deno.stderr);
-
-  const { success } = await command.status;
-
-  return !!success;
+  return ok;
 };
 
-export const getCurrentBranch = async (repository: string) => {
-  const command = new Deno.Command("git", {
-    args: ["-C", repository, "rev-parse", "--abbrev-ref", "HEAD"],
-    stdout: "piped",
-    stderr: "piped",
-  }).spawn();
+export const getCurrentBranch = async (repository: string): Promise<string> => {
+  const { stdout } = await capture(
+    git(repository, "rev-parse", "--abbrev-ref", "HEAD"),
+  );
 
-  const output = await command.output();
-
-  const branch = new TextDecoder().decode(output.stdout);
-
-  return branch.trim();
+  return stdout.trim();
 };
 
 export const push = async (
   repository: string,
   branch: string,
 ): Promise<boolean> => {
-  const command = new Deno.Command("git", {
-    args: ["-C", repository, "push", "origin", branch],
-    stdout: "piped",
-    stderr: "piped",
-  }).spawn();
+  const { ok } = await exec(git(repository, "push", "origin", branch));
 
-  copy(readerFromStreamReader(command.stdout.getReader()), Deno.stdout);
-  copy(readerFromStreamReader(command.stderr.getReader()), Deno.stderr);
-
-  const { success } = await command.status;
-
-  return !!success;
+  return ok;
 };
 
 export const pull = async (
   repository: string,
   branch: string,
 ): Promise<boolean> => {
-  const command = new Deno.Command("git", {
-    args: ["-C", repository, "pull", "origin", branch],
-    stdout: "piped",
-    stderr: "piped",
-  }).spawn();
+  const { ok } = await exec(git(repository, "pull", "origin", branch));
 
-  copy(readerFromStreamReader(command.stdout.getReader()), Deno.stdout);
-  copy(readerFromStreamReader(command.stderr.getReader()), Deno.stderr);
-
-  const { success } = await command.status;
-
-  return !!success;
+  return ok;
 };

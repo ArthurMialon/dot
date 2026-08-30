@@ -1,24 +1,26 @@
-import { Command } from "@cliffy/command";
-import * as config from "../tools/config.ts";
-import * as log from "../tools/logging.ts";
+import { Command } from "commander";
+import * as config from "../tools/config";
+import * as log from "../tools/logging";
+import { exec } from "../tools/process";
 
-export default new Command()
+export const runEdit = async (): Promise<void> => {
+  const configuration = await config.get();
+
+  const editor = process.env.EDITOR;
+
+  if (!editor) {
+    log.error("Please, set the EDITOR environment variable.");
+    log.info("Example with Vim: export EDITOR=vim");
+    process.exit(1);
+  }
+
+  // inherit stdio so terminal editors can take over the TTY
+  await exec([editor, configuration.repo]);
+};
+
+export const editCommand = new Command("edit")
   .description("Open the dotfiles in your editor.")
   .alias("open")
-  .action(async () => {
-    const configuration = await config.get();
+  .action(runEdit);
 
-    const editor = Deno.env.get("EDITOR");
-
-    if (!editor) {
-      log.error("Please, set the EDITOR environment variable.");
-      log.info("Example with Vim: export EDITOR=vim");
-      Deno.exit(1);
-    }
-
-    const command = new Deno.Command(editor, {
-      args: [configuration.repo],
-    });
-
-    await command.output();
-  });
+export default editCommand;

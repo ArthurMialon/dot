@@ -1,45 +1,37 @@
-import Dot from "../dot.ts";
-import { exists } from "@std/fs";
+import { resolve } from "node:path";
+import Dot from "../dot";
+import { exists } from "./fs";
 
 const DEFAULT_IGNORE_CONTENT = `
 .git/
 ${Dot.ignoreFileName}
 `;
 
-export class IgnoreFile {
-  static instance?: IgnoreFile;
+interface IgnorePattern {
+  pattern: string;
+  negative: boolean;
+  regex: RegExp;
+}
 
+export class IgnoreFile {
   private path: string;
   private content: string = DEFAULT_IGNORE_CONTENT;
   private loaded: boolean = false;
-
-  private patterns: Array<{
-    pattern: string;
-    negative: boolean;
-    regex: RegExp;
-  }> = [];
+  private patterns: IgnorePattern[] = [];
 
   constructor(path: string) {
     this.path = path;
-
-    if (!IgnoreFile.instance) {
-      IgnoreFile.instance = this;
-    }
-
-    return IgnoreFile.instance;
   }
 
-  async loadContent() {
+  private async loadContent(): Promise<void> {
     if (!(await exists(this.path))) return;
 
-    const content = await Deno.readTextFile(this.path);
+    const content = await Bun.file(this.path).text();
 
     this.content = DEFAULT_IGNORE_CONTENT.concat(content);
   }
 
   private parseContent(): void {
-    if (this.loaded) return;
-
     const lines = this.content.split("\n");
 
     for (let line of lines) {
@@ -84,7 +76,6 @@ export class IgnoreFile {
     if (!this.loaded) {
       await this.loadContent();
       this.parseContent();
-      return this.ignore(filePath);
     }
 
     const path = filePath
@@ -102,3 +93,23 @@ export class IgnoreFile {
     return shouldIgnore;
   }
 }
+
+const cache = new Map<string, IgnoreFile>();
+
+/**
+ * Cached per absolute path. The previous implementation cached a single
+ * instance for the whole process (the constructor returned the first instance
+ * ever built), so the first path won regardless of what was requested.
+ */
+export const getIgnoreFile = (path: string): IgnoreFile => {
+  const key = resolve(path);
+
+  let file = cache.get(key);
+
+  if (!file) {
+    file = new IgnoreFile(key);
+    cache.set(key, file);
+  }
+
+  return file;
+};

@@ -1,71 +1,74 @@
-import { join } from "@std/path";
-import { Command } from "@cliffy/command";
-import { Confirm } from "@cliffy/prompt";
-import * as config from "../tools/config.ts";
-import * as packages from "../tools/packages.ts";
-import * as log from "../tools/logging.ts";
-import { bold } from "@std/fmt/colors";
+import { join } from "node:path";
+import { Command } from "commander";
+import { confirm } from "@inquirer/prompts";
+import * as config from "../tools/config";
+import * as packages from "../tools/packages";
+import * as log from "../tools/logging";
+import { bold } from "../tools/logging";
 
-export default new Command()
-  .description("Link your packages to target")
-  .alias("l")
-  .option("-v, --verbose", "Display all linked packages", {
-    default: false,
-  })
-  .option(
-    "-f, --force",
-    "Force apply packages without prompt",
-    {
+export interface LinkOptions {
+  package?: string;
+  verbose?: boolean;
+  force?: boolean;
+}
+
+export const runLink = async (options: LinkOptions = {}): Promise<void> => {
+  const { package: requestedPkg, verbose = false, force = false } = options;
+
+  const configuration = await config.get();
+
+  const pkgs = await packages.list(configuration.repo);
+
+  const filteredPkgs = pkgs.filter(
+    (pkg) => !requestedPkg || pkg.name === requestedPkg,
+  );
+
+  if (filteredPkgs.length === 0) {
+    log.info("No package to link");
+    log.info(`Requested: ${bold(requestedPkg || "all")}`);
+    return;
+  }
+
+  log.info(`Ready to apply ${bold(filteredPkgs.length + " package(s)")}`);
+  log.info(`Packages: ${bold(filteredPkgs.map((pkg) => pkg.name).join(", "))}`);
+
+  if (!force) {
+    const confirmed = await confirm({
+      message: `Apply ${filteredPkgs.length} package(s)?`,
       default: false,
-    },
-  )
-  .arguments("[package]")
-  .action(async ({ verbose, force }, requestedPkg) => {
-    const configuration = await config.get();
+    });
 
-    const pkgs = await packages.list(configuration.repo);
+    if (!confirmed) return;
+  }
 
-    const filteredPkgs = pkgs
-      .filter((pkg) => {
-        if (!requestedPkg) return true;
-        return pkg.name === requestedPkg;
-      });
-
-    if (filteredPkgs.length === 0) {
-      log.info("No package to link");
-      log.info(`Requested: ${bold(requestedPkg || "all")}`);
-      return;
-    }
-
-    log.info(`Ready to apply ${bold(filteredPkgs.length + " package(s)")}`);
-    log.info(
-      `Packages: ${bold(filteredPkgs.map((pkg) => pkg.name).join(", "))}`,
+  for (const pkg of filteredPkgs) {
+    log.success(
+      `Set ${pkg.files.length} file(s) from package ${bold(pkg.name)}`,
     );
 
-    if (!force) {
-      const confirm = await Confirm.prompt({
-        message: `Apply ${filteredPkgs.length} package(s)?`,
-      });
-
-      if (!confirm) return Deno.exit(0);
-    }
-
-    for await (const pkg of filteredPkgs) {
-      log.success(
-        `Set ${pkg.files.length} file(s) from package ${bold(pkg.name)}`,
-      );
-
-      if (verbose) {
-        pkg.files.forEach((file) => {
-          log.info(
-            join(configuration.target, file.directory, file.name),
-            "->",
-            join(file.directory, file.name),
-          );
-        });
-        log.info("");
+    if (verbose) {
+      for (const file of pkg.files) {
+        log.info(
+          packages.targetPathFor(configuration.target, file),
+          "->",
+          join(file.directory, file.name),
+        );
       }
-
-      await packages.linkPackage(configuration, pkg);
+      log.info("");
     }
-  });
+
+    await packages.linkPackage(configuration, pkg);
+  }
+};
+
+export const linkCommand = new Command("link")
+  .description("Link your packages to target")
+  .alias("l")
+  .argument("[package]", "Only link this package")
+  .option("-v, --verbose", "Display all linked packages", false)
+  .option("-f, --force", "Force apply packages without prompt", false)
+  .action((pkg: string | undefined, options: LinkOptions) =>
+    runLink({ ...options, package: pkg }),
+  );
+
+export default linkCommand;

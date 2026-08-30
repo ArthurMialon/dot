@@ -1,70 +1,87 @@
-import { bold } from "@std/fmt/colors";
-import { join } from "@std/path";
-import { Command } from "@cliffy/command";
-import { Confirm } from "@cliffy/prompt";
-import * as config from "../tools/config.ts";
-import * as packages from "../tools/packages.ts";
-import * as log from "../tools/logging.ts";
+import { Command } from "commander";
+import { confirm } from "@inquirer/prompts";
+import * as config from "../tools/config";
+import * as packages from "../tools/packages";
+import * as log from "../tools/logging";
+import { bold, yellow } from "../tools/logging";
 
-export default new Command()
-  .description("Unlink your packages from target")
-  .alias("remove")
-  .alias("u")
-  .option("-v, --verbose", "Display all unlinked packages", {
-    default: false,
-  })
-  .option("-f, --force", "Unlink all the pacakges directly without prompt", {
-    default: false,
-  })
-  .arguments("[package]")
-  .action(async ({ verbose, force }, requestedPkg) => {
-    const configuration = await config.get();
+export interface UnlinkOptions {
+  package?: string;
+  verbose?: boolean;
+  force?: boolean;
+}
 
-    const pkgs = await packages.list(configuration.repo)
-      .catch(() => []);
+export const runUnlink = async (options: UnlinkOptions = {}): Promise<void> => {
+  const { package: requestedPkg, verbose = false, force = false } = options;
 
-    const filteredPkgs = pkgs
-      .filter((pkg) => {
-        if (!requestedPkg) return true;
-        return pkg.name === requestedPkg;
-      });
+  const configuration = await config.get();
 
-    if (filteredPkgs.length === 0) {
-      log.info("No package to unlink");
-      log.info(`Requested: ${bold(requestedPkg || "all")}`);
-      return;
-    }
+  const pkgs = await packages.list(configuration.repo).catch(() => []);
 
-    log.info(`Ready to unlink ${filteredPkgs.length} package(s)`);
-    log.info(
-      `Packages: ${bold(filteredPkgs.map((pkg) => pkg.name).join(", "))}`,
+  const filteredPkgs = pkgs.filter(
+    (pkg) => !requestedPkg || pkg.name === requestedPkg,
+  );
+
+  if (filteredPkgs.length === 0) {
+    log.info("No package to unlink");
+    log.info(`Requested: ${bold(requestedPkg || "all")}`);
+    return;
+  }
+
+  log.info(`Ready to unlink ${filteredPkgs.length} package(s)`);
+  log.info(`Packages: ${bold(filteredPkgs.map((pkg) => pkg.name).join(", "))}`);
+
+  if (!force) {
+    const confirmed = await confirm({
+      message: `Unlink ${filteredPkgs.length} package(s)?`,
+      default: false,
+    });
+
+    if (!confirmed) return;
+  }
+
+  for (const pkg of filteredPkgs) {
+    const reports = await packages.unlinkPackage(configuration, pkg);
+
+    const removed = reports.filter((r) => r.outcome === "removed");
+    const skipped = reports.filter((r) => r.outcome.startsWith("skipped"));
+
+    log.success(
+      `Unlinked ${removed.length} file(s) from package ${bold(pkg.name)}`,
     );
 
-    if (!force) {
-      const confirm = await Confirm.prompt({
-        message: `Unlink ${filteredPkgs.length} package(s)?`,
-      });
-
-      if (!confirm) return Deno.exit(0);
-    }
-
-    for await (const pkg of filteredPkgs) {
-      log.success(
-        `Unlinked ${pkg.files.length} file(s) from package ${bold(pkg.name)}`,
-      );
-
-      if (verbose) {
-        pkg.files.forEach((file) => {
-          log.info(
-            "Unlinked",
-            join(configuration.target, file.directory, file.name),
-            "->",
-            join(file.directory, file.name),
-          );
-        });
-        log.info("");
+    if (verbose) {
+      for (const report of removed) {
+        log.info("Unlinked", report.target);
       }
-
-      await packages.unlinkPackage(configuration, pkg);
+      log.info("");
     }
-  });
+
+    // Never silently leave a file the user thinks was unlinked.
+    for (const report of skipped) {
+      log.info(
+        yellow("Skipped"),
+        report.target,
+        report.outcome === "skipped-not-symlink"
+          ? "(not a symlink)"
+          : "(symlink points elsewhere)",
+      );
+    }
+  }
+};
+
+export const unlinkCommand = new Command("unlink")
+  .description("Unlink your packages from target")
+  .aliases(["remove", "u"])
+  .argument("[package]", "Only unlink this package")
+  .option("-v, --verbose", "Display all unlinked packages", false)
+  .option(
+    "-f, --force",
+    "Unlink all the packages directly without prompt",
+    false,
+  )
+  .action((pkg: string | undefined, options: UnlinkOptions) =>
+    runUnlink({ ...options, package: pkg }),
+  );
+
+export default unlinkCommand;
