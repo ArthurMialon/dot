@@ -13,7 +13,10 @@ const runCli = async (args: string[], home?: string) => {
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, HOME: home, DOT_VERSION: undefined },
+    // NO_COLOR keeps stdout free of ANSI so assertions do not depend on the
+    // environment: picocolors force-enables colour whenever CI is set, even
+    // through a pipe, which is why these passed locally and failed on CI.
+    env: { ...process.env, HOME: home, DOT_VERSION: undefined, NO_COLOR: "1" },
   });
 
   const [stdout, stderr] = await Promise.all([
