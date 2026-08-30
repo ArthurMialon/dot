@@ -10,6 +10,11 @@ on:
       - bun.lock
       - tsconfig.json
 
+# Never cancel a release that is already publishing artifacts.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest

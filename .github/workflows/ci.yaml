@@ -2,9 +2,13 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches-ignore:
-      - main
+
+# A pull_request and a push trigger would both fire on every push to a PR
+# branch, running this twice. Pushes to main are covered by the release
+# workflow, so pull_request alone is enough.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
