@@ -6,7 +6,7 @@ import * as log from "../tools/logging";
 import { bold, yellow } from "../tools/logging";
 import { confirm } from "../tools/prompt";
 import { isInteractive } from "../tools/prompt";
-import { addPackageToProfile, ManifestError } from "../tools/profiles";
+import { includePackage, ManifestError } from "../tools/profiles";
 import { resolveSelection } from "./selection";
 
 export interface LinkOptions {
@@ -129,14 +129,14 @@ const narrowToPackage = async (
         `Package ${bold(requestedPkg)} is not part of profile ${bold(profileName)}.`,
       );
       log.info(
-        `Use --all to link it anyway, or: dot profile add ${requestedPkg} --profile ${profileName}`,
+        `Use --all to link it once, or: dot profile add ${requestedPkg} --profile ${profileName}`,
       );
       process.exit(1);
     }
 
     log.info(
       yellow("⚠"),
-      `Package ${bold(requestedPkg)} exists but is not part of profile ${bold(profileName)}.`,
+      `Package ${bold(requestedPkg)} is kept out of profile ${bold(profileName)}.`,
     );
 
     const anyway = await confirm({
@@ -147,19 +147,17 @@ const narrowToPackage = async (
     if (!anyway) return [];
 
     const record = await confirm({
-      message: `Also add "${requestedPkg}" to profile "${profileName}" in dot.json?`,
+      message: `Stop excluding "${requestedPkg}" from "${profileName}" in dot.json?`,
       default: false,
     });
 
     if (record) {
-      await addPackageToProfile(
-        configuration.repo,
-        requestedPkg,
-        profileName,
-      ).catch((error: unknown) => {
-        if (error instanceof ManifestError) log.error(error.message);
-        else throw error;
-      });
+      await includePackage(configuration.repo, requestedPkg, profileName).catch(
+        (error: unknown) => {
+          if (error instanceof ManifestError) log.error(error.message);
+          else throw error;
+        },
+      );
     }
   }
 

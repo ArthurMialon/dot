@@ -6,22 +6,28 @@ import { PathExpansionError, exists, expandPath } from "./fs";
 export interface DotProfile {
   /** Free text shown by `dot profile list`. */
   description?: string;
-  /** Package directories this profile activates, on top of `common`. */
-  packages: string[];
+  /**
+   * Packages this profile links, or ["*"] for every package in the repository.
+   * Absent means ["*"]: a profile opts out, it does not opt in, so a new folder
+   * is linked everywhere without touching the manifest.
+   */
+  include: string[];
+  /** Packages removed from the include set. Always wins over include. */
+  exclude: string[];
   /** Symlink target for machines whose home is shaped differently. */
   target?: string;
 }
 
 export interface DotManifest {
   version: number;
-  /** Packages linked by every profile. */
-  common: string[];
   /** Insertion order is preserved and drives link order. */
   profiles: Record<string, DotProfile>;
 }
 
-export const MANIFEST_VERSION = 1;
-export const COMMON_KEY = "common";
+export const MANIFEST_VERSION = 2;
+
+/** The only pattern. Everything else is a literal package name. */
+export const ALL = "*";
 
 export class ManifestError extends Error {
   readonly hint?: string;
@@ -40,18 +46,33 @@ export const hasManifest = (repo: string): Promise<boolean> =>
   exists(manifestPath(repo));
 
 const SKELETON = `{
-  "version": 1,
-  "common": ["git", "zsh"],
+  "version": 2,
   "profiles": {
-    "macbook": { "packages": ["brew"] }
+    "macbook": { "exclude": ["docker"] },
+    "raspberrypi": { "include": ["docker", "git"] }
   }
 }`;
 
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((item) => typeof item === "string");
 
-const validatePackageNames = (names: string[], where: string): void => {
+const validatePackageNames = (
+  names: string[],
+  where: string,
+  { allowAll = false }: { allowAll?: boolean } = {},
+): void => {
   for (const name of names) {
+    if (name === ALL) {
+      if (allowAll) continue;
+
+      // Otherwise "*" would be read as a package literally named "*", match
+      // nothing, and silently do the opposite of what was meant.
+      throw new ManifestError(
+        `${where}: "${ALL}" is only meaningful in "include".`,
+        `To link nothing, use "include": [].`,
+      );
+    }
+
     if (!name || name.includes("/") || name.includes("\\") || name === "..") {
       throw new ManifestError(`${where}: invalid package name "${name}".`);
     }
@@ -93,6 +114,7 @@ export const loadManifest = async (
   const manifest = parsed as Record<string, unknown>;
 
   const version = manifest.version ?? MANIFEST_VERSION;
+  const isLegacy = version === 1;
 
   if (typeof version !== "number" || version > MANIFEST_VERSION) {
     const declared = typeof version === "number" ? version : "an invalid value";
@@ -103,13 +125,15 @@ export const loadManifest = async (
     );
   }
 
-  const common = manifest.common ?? [];
+  // Version 1 shape: a root "common" list plus "packages" per profile. Both
+  // fold into "include", so an existing manifest keeps working untouched.
+  const legacyCommon = manifest.common ?? [];
 
-  if (!isStringArray(common)) {
+  if (!isStringArray(legacyCommon)) {
     throw new ManifestError(`"common" must be an array of package names.`);
   }
 
-  validatePackageNames(common, `"${COMMON_KEY}"`);
+  validatePackageNames(legacyCommon, `"common"`);
 
   const rawProfiles = manifest.profiles;
 
@@ -134,15 +158,53 @@ export const loadManifest = async (
     }
 
     const profile = value as Record<string, unknown>;
-    const packages = profile.packages ?? [];
 
-    if (!isStringArray(packages)) {
+    const legacyPackages = profile.packages ?? [];
+
+    if (!isStringArray(legacyPackages)) {
       throw new ManifestError(
         `Profile "${name}": "packages" must be an array of package names.`,
       );
     }
 
-    validatePackageNames(packages, `Profile "${name}"`);
+    validatePackageNames(legacyPackages, `Profile "${name}"`);
+
+    const hasLegacyKeys =
+      isLegacy || legacyCommon.length > 0 || legacyPackages.length > 0;
+
+    if (
+      hasLegacyKeys &&
+      (profile.include !== undefined || profile.exclude !== undefined)
+    ) {
+      throw new ManifestError(
+        `Profile "${name}" mixes the old "packages" key with "include"/"exclude".`,
+        `Keep only "include" and "exclude", and drop "common" and "packages".`,
+      );
+    }
+
+    const rawInclude =
+      profile.include ??
+      (hasLegacyKeys ? [...legacyCommon, ...legacyPackages] : [ALL]);
+
+    if (!isStringArray(rawInclude)) {
+      throw new ManifestError(
+        `Profile "${name}": "include" must be an array of package names.`,
+      );
+    }
+
+    validatePackageNames(rawInclude, `Profile "${name}" include`, {
+      allowAll: true,
+    });
+
+    const rawExclude = profile.exclude ?? [];
+
+    if (!isStringArray(rawExclude)) {
+      throw new ManifestError(
+        `Profile "${name}": "exclude" must be an array of package names.`,
+      );
+    }
+
+    validatePackageNames(rawExclude, `Profile "${name}" exclude`);
 
     if (profile.target !== undefined && typeof profile.target !== "string") {
       throw new ManifestError(`Profile "${name}": "target" must be a string.`);
@@ -158,7 +220,8 @@ export const loadManifest = async (
     }
 
     profiles[name] = {
-      packages,
+      include: [...new Set(rawInclude)],
+      exclude: [...new Set(rawExclude)],
       ...(typeof profile.target === "string" ? { target: profile.target } : {}),
       ...(typeof profile.description === "string"
         ? { description: profile.description }
@@ -166,7 +229,7 @@ export const loadManifest = async (
     };
   }
 
-  return { version: MANIFEST_VERSION, common, profiles };
+  return { version: MANIFEST_VERSION, profiles };
 };
 
 export const listProfileNames = async (repo: string): Promise<string[]> => {
@@ -216,10 +279,14 @@ const levenshtein = (a: string, b: string): number => {
 export interface ResolvedProfile {
   name: string;
   description?: string;
-  /** common first, then the profile's own packages, de-duplicated. */
+  /** The packages this profile links, after applying exclude. */
   packages: string[];
-  /** Declared packages with no directory on disk. */
+  /** Names in include that have no directory on disk. */
   missing: string[];
+  /** Names in exclude that match nothing — usually a typo. */
+  staleExcludes: string[];
+  /** True when include is ["*"], i.e. the profile takes everything by default. */
+  includesAll: boolean;
   target?: string;
 }
 
@@ -250,13 +317,32 @@ export const resolveProfile = (
     );
   }
 
-  const declared = [...new Set([...manifest.common, ...profile.packages])];
+  const includesAll = profile.include.includes(ALL);
+
+  // "*" is sorted so link order is identical on every machine, rather than
+  // following whatever order the filesystem hands back.
+  const declared = includesAll ? [...packagesOnDisk].sort() : profile.include;
+
+  const excluded = new Set(profile.exclude);
+
+  const packages = declared
+    .filter((pkg) => packagesOnDisk.includes(pkg))
+    .filter((pkg) => !excluded.has(pkg));
 
   return {
     name,
     ...(profile.description ? { description: profile.description } : {}),
-    packages: declared.filter((pkg) => packagesOnDisk.includes(pkg)),
-    missing: declared.filter((pkg) => !packagesOnDisk.includes(pkg)),
+    packages,
+    // Only an explicit include can name something that is not there; "*"
+    // cannot be wrong.
+    missing: includesAll
+      ? []
+      : profile.include.filter((pkg) => !packagesOnDisk.includes(pkg)),
+    // A typo here silently links what you meant to drop, so say so.
+    staleExcludes: profile.exclude.filter(
+      (pkg) => !packagesOnDisk.includes(pkg),
+    ),
+    includesAll,
     ...(profile.target ? { target: resolveTarget(profile) } : {}),
   };
 };
@@ -324,6 +410,12 @@ export const selectPackages = async (
       `Profile "${name}" references package "${pkg}", which does not exist in ${configuration.repo} (skipped).`,
   );
 
+  for (const pkg of profile.staleExcludes) {
+    warnings.push(
+      `Profile "${name}" excludes package "${pkg}", which does not exist in ${configuration.repo}.`,
+    );
+  }
+
   if (profile.packages.length === 0) {
     warnings.push(`Profile "${name}" activates no packages.`);
   }
@@ -355,9 +447,19 @@ const serialize = (manifest: DotManifest): string => {
       fields.push(`      "target": ${JSON.stringify(profile.target)}`);
     }
 
-    fields.push(`      "packages": ${inlineArray(profile.packages)}`);
+    // Omit the defaults so a profile that takes everything stays a one-liner.
+    if (!(profile.include.length === 1 && profile.include[0] === ALL)) {
+      fields.push(`      "include": ${inlineArray(profile.include)}`);
+    }
+
+    if (profile.exclude.length > 0) {
+      fields.push(`      "exclude": ${inlineArray(profile.exclude)}`);
+    }
 
     const comma = index === entries.length - 1 ? "" : ",";
+
+    // A profile with nothing but defaults renders as {}.
+    if (fields.length === 0) return `    ${JSON.stringify(name)}: {}${comma}`;
 
     return `    ${JSON.stringify(name)}: {\n${fields.join(",\n")}\n    }${comma}`;
   });
@@ -365,7 +467,6 @@ const serialize = (manifest: DotManifest): string => {
   return [
     "{",
     `  "version": ${manifest.version},`,
-    `  "common": ${inlineArray(manifest.common)},`,
     '  "profiles": {',
     ...profiles,
     "  }",
@@ -389,11 +490,7 @@ const assertNoComments = async (repo: string): Promise<void> => {
   }
 };
 
-export const addPackageToProfile = async (
-  repo: string,
-  pkg: string,
-  profileName: string,
-): Promise<void> => {
+const loadForWrite = async (repo: string): Promise<DotManifest> => {
   await assertNoComments(repo);
 
   const manifest = await loadManifest(repo);
@@ -405,65 +502,81 @@ export const addPackageToProfile = async (
     );
   }
 
-  if (profileName === COMMON_KEY) {
-    if (!manifest.common.includes(pkg)) manifest.common.push(pkg);
-  } else {
-    const profile = manifest.profiles[profileName];
-
-    if (!profile) {
-      throw new ManifestError(
-        `Unknown profile "${profileName}".`,
-        `Available profiles: ${Object.keys(manifest.profiles).join(", ")}.`,
-      );
-    }
-
-    if (!profile.packages.includes(pkg)) profile.packages.push(pkg);
-  }
-
-  await Bun.write(manifestPath(repo), serialize(manifest));
+  return manifest;
 };
 
-export const removePackageFromProfile = async (
+const profileOf = (manifest: DotManifest, name: string): DotProfile => {
+  const profile = manifest.profiles[name];
+
+  if (!profile) {
+    throw new ManifestError(
+      `Unknown profile "${name}".`,
+      `Available profiles: ${Object.keys(manifest.profiles).join(", ")}.`,
+    );
+  }
+
+  return profile;
+};
+
+const without = (list: string[], pkg: string) =>
+  list.filter((name) => name !== pkg);
+
+/**
+ * Make a package part of a profile. With the default include of ["*"] that just
+ * means dropping it from exclude; with an explicit list it is added there.
+ */
+export const includePackage = async (
   repo: string,
   pkg: string,
-  profileName?: string,
+  profileName: string,
 ): Promise<void> => {
-  await assertNoComments(repo);
+  const manifest = await loadForWrite(repo);
+  const profile = profileOf(manifest, profileName);
 
-  const manifest = await loadManifest(repo);
+  profile.exclude = without(profile.exclude, pkg);
 
-  if (!manifest) {
-    throw new ManifestError(`This repository has no ${Dot.manifestFileName}.`);
-  }
-
-  const drop = (list: string[]) => list.filter((name) => name !== pkg);
-
-  if (!profileName || profileName === COMMON_KEY) {
-    manifest.common = drop(manifest.common);
-  }
-
-  for (const [name, profile] of Object.entries(manifest.profiles)) {
-    if (profileName && profileName !== COMMON_KEY && name !== profileName) {
-      continue;
-    }
-
-    profile.packages = drop(profile.packages);
+  if (!profile.include.includes(ALL) && !profile.include.includes(pkg)) {
+    profile.include.push(pkg);
   }
 
   await Bun.write(manifestPath(repo), serialize(manifest));
 };
 
-/** Scaffold a manifest from the packages currently on disk. */
+/**
+ * Keep a package out of a profile. Under the default include it becomes an
+ * exclude; under an explicit list it is simply dropped from that list, so the
+ * manifest never carries both statements about the same package.
+ */
+export const excludePackage = async (
+  repo: string,
+  pkg: string,
+  profileName: string,
+): Promise<void> => {
+  const manifest = await loadForWrite(repo);
+  const profile = profileOf(manifest, profileName);
+
+  if (profile.include.includes(ALL)) {
+    if (!profile.exclude.includes(pkg)) profile.exclude.push(pkg);
+  } else {
+    profile.include = without(profile.include, pkg);
+    profile.exclude = without(profile.exclude, pkg);
+  }
+
+  await Bun.write(manifestPath(repo), serialize(manifest));
+};
+
+/**
+ * Scaffold a manifest. Every profile starts empty, which means "link
+ * everything" — you subtract from there instead of enumerating.
+ */
 export const initManifest = async (
   repo: string,
-  packagesOnDisk: string[],
   profileNames: string[],
 ): Promise<DotManifest> => {
   const manifest: DotManifest = {
     version: MANIFEST_VERSION,
-    common: [...packagesOnDisk],
     profiles: Object.fromEntries(
-      profileNames.map((name) => [name, { packages: [] }]),
+      profileNames.map((name) => [name, { include: [ALL], exclude: [] }]),
     ),
   };
 

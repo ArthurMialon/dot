@@ -131,7 +131,29 @@ describe("non-interactive safety", () => {
 });
 
 /** A HOME whose dotfiles repository declares three machine profiles. */
-const profiledHome = async (activeProfile?: string): Promise<string> => {
+/** The v2 manifest: profiles subtract, they do not enumerate. */
+const V2_MANIFEST = {
+  version: 2,
+  profiles: {
+    macbook: { exclude: ["docker"] },
+    raspberrypi: { include: ["docker", "git", "zsh"] },
+  },
+};
+
+/** The shape shipped in v1.5.0, kept to prove it still loads. */
+const V1_MANIFEST = {
+  version: 1,
+  common: ["git", "zsh"],
+  profiles: {
+    macbook: { packages: ["brew"] },
+    raspberrypi: { packages: ["docker"] },
+  },
+};
+
+const profiledHome = async (
+  activeProfile?: string,
+  manifest: unknown = V2_MANIFEST,
+): Promise<string> => {
   const home = await mkdtemp(join(tmpdir(), "dot-cli-profile-"));
   const repo = join(home, "dotfiles");
 
@@ -140,21 +162,7 @@ const profiledHome = async (activeProfile?: string): Promise<string> => {
     await writeFile(join(repo, pkg, `.${pkg}rc`), `${pkg}\n`);
   }
 
-  await writeFile(
-    join(repo, "dot.json"),
-    JSON.stringify(
-      {
-        version: 1,
-        common: ["git", "zsh"],
-        profiles: {
-          macbook: { packages: ["brew"] },
-          raspberrypi: { packages: ["docker"] },
-        },
-      },
-      null,
-      2,
-    ),
-  );
+  await writeFile(join(repo, "dot.json"), JSON.stringify(manifest, null, 2));
 
   await mkdir(join(home, ".dot"), { recursive: true });
   await writeFile(
@@ -276,5 +284,61 @@ describe("profiles", () => {
 
     expect(code).toBe(1);
     expect(stdout).toContain("profiles are not configured");
+  });
+});
+
+describe("include/exclude model", () => {
+  // The whole point of the model: a folder added to the repository is linked
+  // without anyone editing dot.json.
+  test("a brand new package links with no manifest change", async () => {
+    const home = await profiledHome("macbook");
+    const repo = join(home, "dotfiles");
+
+    await mkdir(join(repo, "ghostty"), { recursive: true });
+    await writeFile(join(repo, "ghostty", ".ghosttyrc"), "ghostty\n");
+
+    const before = await Bun.file(join(repo, "dot.json")).text();
+
+    const { code } = await runCli(["link", "-f"], home);
+
+    expect(code).toBe(0);
+    expect(await linked(home, ".ghosttyrc")).toBe(true);
+    expect(await Bun.file(join(repo, "dot.json")).text()).toBe(before);
+  });
+
+  test("an excluded package stays unlinked", async () => {
+    const home = await profiledHome("macbook");
+
+    await runCli(["link", "-f"], home);
+
+    expect(await linked(home, ".dockerrc")).toBe(false);
+    expect(await linked(home, ".brewrc")).toBe(true);
+  });
+
+  test("profile remove excludes, profile add restores", async () => {
+    const home = await profiledHome("macbook");
+    const repo = join(home, "dotfiles");
+
+    await runCli(["profile", "remove", "brew"], home);
+    await runCli(["link", "-f"], home);
+    expect(await linked(home, ".brewrc")).toBe(false);
+
+    expect(await Bun.file(join(repo, "dot.json")).text()).toContain("brew");
+
+    await runCli(["profile", "add", "brew"], home);
+    await runCli(["link", "-f"], home);
+    expect(await linked(home, ".brewrc")).toBe(true);
+  });
+
+  // v1.5.0 shipped the common/packages shape; it must still work untouched.
+  test("a version 1 manifest still resolves", async () => {
+    const home = await profiledHome("macbook", V1_MANIFEST);
+
+    const { code } = await runCli(["link", "-f"], home);
+
+    expect(code).toBe(0);
+    expect(await linked(home, ".gitrc")).toBe(true);
+    expect(await linked(home, ".brewrc")).toBe(true);
+    expect(await linked(home, ".dockerrc")).toBe(false);
   });
 });

@@ -95,43 +95,53 @@ One dotfiles repository, several machines. Declare a `dot.json` at its root:
 
 ```json
 {
-  "version": 1,
-  "common": ["git", "zsh", "starship", "vim"],
+  "version": 2,
   "profiles": {
     "macbook": {
       "description": "Work MacBook Pro",
-      "packages": ["aws", "brew", "npm", "zed"]
+      "exclude": ["docker"]
     },
     "macmini": {
       "description": "Home Mac Mini",
-      "packages": ["brew", "npm", "zed"]
+      "exclude": ["docker", "aws"]
     },
     "raspberrypi": {
       "description": "Raspberry Pi 5, headless",
       "target": "/home/pi",
-      "packages": ["docker"]
+      "include": ["docker", "git", "zsh"]
     }
   }
 }
 ```
 
-Every profile links the `common` packages **plus** its own, so a package shared
-by two machines is written once and listed in both. A profile may set its own
-`target`, which is applied when you select it.
+**A profile links every package by default and you subtract from there.** That is
+what `include` defaults to: `["*"]`, the only pattern the manifest understands.
+So a new folder in your repository is linked on every machine without touching
+`dot.json` — you only edit it to make an exception.
+
+Use `include` when a machine should take a short, fixed list instead, like the
+Raspberry Pi above. `exclude` always wins over `include`.
+
+A profile may set its own `target`, which is applied when you select it.
 
 Pick one per machine:
 
 ```bash
 dot init git@github.com:me/dotfiles.git --profile raspberrypi --yes  # at install
 dot profile                     # which profile is this machine on?
-dot profile list                # every profile and its package count
+dot profile list                # every profile and how much it links
 dot profile use macbook         # switch, unlinking what is no longer needed
+dot profile remove docker       # keep a package off this machine
+dot profile add docker          # and put it back
 dot link --profile macmini      # one-shot, nothing is persisted
-dot list --all                  # every package and the profiles it belongs to
+dot list --all                  # every package and the profiles that skip it
 ```
 
 **No `dot.json`? Nothing changes** — every package is linked, exactly as before.
-Create one from what you already have with `dot profile init`.
+Create one with `dot profile init`.
+
+Manifests written for 0.x, with a top-level `common` and `packages` per profile,
+are still read: both fold into `include`.
 
 ## Features
 
@@ -266,7 +276,9 @@ dot profile init               # create dot.json from the packages on disk
 Use `--dry-run` to stop there, `-f` to skip the confirmation, and
 `--no-unlink` to keep the links from the previous profile.
 
-`profile add` and `profile remove` accept `-p, --profile <name>` or `--common`.
+`profile add` and `profile remove` act on the active profile, or on the one
+given with `-p, --profile <name>`. Under the default `include`, removing adds an
+`exclude`; under an explicit `include`, it drops the name from that list.
 
 ---
 
@@ -324,10 +336,10 @@ dot add . zsh          # into a specific package (created if missing)
 dot add .zshrc zsh
 ```
 
-**Options:** `-f, --force`, `-p, --profile <name>`, `--common`, `--no-profile`
+**Options:** `-f, --force`
 
-When the repository has a `dot.json`, a brand new package is recorded in a
-profile, otherwise it would be created and then never linked.
+Nothing is written to `dot.json`: a new package is linked by every profile that
+does not exclude it.
 
 ---
 

@@ -1,25 +1,32 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
-  COMMON_KEY,
   ManifestError,
-  addPackageToProfile,
+  excludePackage,
+  includePackage,
   loadManifest,
-  removePackageFromProfile,
   resolveProfile,
   resolveTarget,
   selectPackages,
+  type DotManifest,
 } from "../src/tools/profiles";
 import { createFixture, type Fixture } from "./helpers/fixture";
 
 let fixture: Fixture;
 
-const MANIFEST = {
-  version: 1,
-  common: ["git", "zsh"],
+const MANIFEST: DotManifest = {
+  version: 2,
   profiles: {
-    macbook: { description: "Work laptop", packages: ["brew", "nvim"] },
-    macmini: { packages: ["brew"] },
-    raspberrypi: { packages: ["docker"], target: "/home/pi" },
+    macbook: {
+      description: "Work laptop",
+      include: ["*"],
+      exclude: ["docker"],
+    },
+    macmini: { include: ["*"], exclude: ["docker", "nvim"] },
+    raspberrypi: {
+      include: ["docker", "git", "zsh"],
+      exclude: [],
+      target: "/home/pi",
+    },
   },
 };
 
@@ -37,6 +44,15 @@ afterEach(() => fixture.cleanup());
 describe("loadManifest", () => {
   test("returns null when absent, so legacy repos are untouched", async () => {
     expect(await loadManifest(fixture.repo)).toBeNull();
+  });
+
+  test("a profile with no keys includes everything", async () => {
+    await writeManifest({ version: 2, profiles: { mac: {} } });
+
+    const manifest = (await loadManifest(fixture.repo))!;
+
+    expect(manifest.profiles.mac.include).toEqual(["*"]);
+    expect(manifest.profiles.mac.exclude).toEqual([]);
   });
 
   test("rejects malformed JSON with a helpful error", async () => {
@@ -59,26 +75,107 @@ describe("loadManifest", () => {
   });
 
   test("rejects a package name that escapes the repository", async () => {
-    await writeManifest({ profiles: { a: { packages: ["../evil"] } } });
+    await writeManifest({ profiles: { a: { include: ["../evil"] } } });
 
     expect(loadManifest(fixture.repo)).rejects.toThrow(/invalid package name/);
+  });
+
+  test("accepts the wildcard as an include but not as an exclude", async () => {
+    await writeManifest({ profiles: { a: { include: ["*"] } } });
+    expect((await loadManifest(fixture.repo))!.profiles.a.include).toEqual([
+      "*",
+    ]);
+
+    await writeManifest({ profiles: { a: { exclude: ["*"] } } });
+    expect(loadManifest(fixture.repo)).rejects.toThrow(
+      /only meaningful in "include"/,
+    );
+  });
+});
+
+// The v1 shape shipped in v1.5.0, so an existing repository must keep working.
+describe("version 1 manifests", () => {
+  test("folds common and packages into include", async () => {
+    await writeManifest({
+      version: 1,
+      common: ["git", "zsh"],
+      profiles: { mac: { packages: ["brew"] } },
+    });
+
+    const manifest = (await loadManifest(fixture.repo))!;
+
+    expect(manifest.version).toBe(2);
+    expect(manifest.profiles.mac.include).toEqual(["git", "zsh", "brew"]);
+    expect(manifest.profiles.mac.exclude).toEqual([]);
+  });
+
+  test("resolves to the same packages it used to", async () => {
+    await writeManifest({
+      version: 1,
+      common: ["git"],
+      profiles: { mac: { packages: ["brew"] } },
+    });
+
+    const manifest = (await loadManifest(fixture.repo))!;
+
+    expect(resolveProfile(manifest, "mac", ON_DISK).packages).toEqual([
+      "git",
+      "brew",
+    ]);
+  });
+
+  test("refuses a manifest that mixes both shapes", async () => {
+    await writeManifest({
+      version: 1,
+      common: ["git"],
+      profiles: { mac: { packages: ["brew"], exclude: ["docker"] } },
+    });
+
+    expect(loadManifest(fixture.repo)).rejects.toThrow(/mixes the old/);
   });
 });
 
 describe("resolveProfile", () => {
-  test("unions common with the profile, in order", () => {
+  test("takes everything by default, minus the excludes", () => {
     const resolved = resolveProfile(MANIFEST, "macbook", ON_DISK);
 
-    expect(resolved.packages).toEqual(["git", "zsh", "brew", "nvim"]);
-    expect(resolved.missing).toEqual([]);
-    expect(resolved.description).toBe("Work laptop");
+    // sorted, so link order matches on every machine
+    expect(resolved.packages).toEqual(["brew", "git", "nvim", "zsh"]);
+    expect(resolved.includesAll).toBe(true);
   });
 
-  test("reports packages declared but missing on disk", () => {
-    const resolved = resolveProfile(MANIFEST, "macbook", ["git", "brew"]);
+  test("a new package needs no manifest change", () => {
+    const resolved = resolveProfile(MANIFEST, "macbook", [
+      ...ON_DISK,
+      "ghostty",
+    ]);
 
-    expect(resolved.packages).toEqual(["git", "brew"]);
-    expect(resolved.missing).toEqual(["zsh", "nvim"]);
+    expect(resolved.packages).toContain("ghostty");
+  });
+
+  test("an explicit include takes only what it names", () => {
+    const resolved = resolveProfile(MANIFEST, "raspberrypi", ON_DISK);
+
+    expect(resolved.packages).toEqual(["docker", "git", "zsh"]);
+    expect(resolved.includesAll).toBe(false);
+  });
+
+  test("reports an include naming something absent", () => {
+    const resolved = resolveProfile(MANIFEST, "raspberrypi", ["git", "zsh"]);
+
+    expect(resolved.packages).toEqual(["git", "zsh"]);
+    expect(resolved.missing).toEqual(["docker"]);
+  });
+
+  // A typo'd exclude silently links what you meant to drop.
+  test("reports an exclude that matches nothing", () => {
+    const resolved = resolveProfile(MANIFEST, "macbook", ["git", "zsh"]);
+
+    expect(resolved.staleExcludes).toEqual(["docker"]);
+  });
+
+  test("a wildcard include can never be missing", () => {
+    expect(resolveProfile(MANIFEST, "macbook", []).missing).toEqual([]);
   });
 
   test("suggests a close name for an unknown profile", () => {
@@ -149,7 +246,7 @@ describe("selectPackages", () => {
     );
 
     expect(selection.mode).toBe("profile");
-    expect(selection.names).toEqual(["git", "zsh", "docker"]);
+    expect(selection.names).toEqual(["docker", "git", "zsh"]);
   });
 
   test("--profile overrides the active profile", async () => {
@@ -161,7 +258,7 @@ describe("selectPackages", () => {
       { profile: "macmini" },
     );
 
-    expect(selection.names).toEqual(["git", "zsh", "brew"]);
+    expect(selection.names).toEqual(["brew", "git", "zsh"]);
   });
 
   test("--all ignores the profile", async () => {
@@ -186,45 +283,80 @@ describe("selectPackages", () => {
       }),
     ).rejects.toThrow(/mutually exclusive/);
   });
+
+  test("warns about a stale exclude", async () => {
+    await writeManifest(MANIFEST);
+
+    const selection = await selectPackages(
+      { ...fixture.config, profile: "macbook" },
+      ["git", "zsh"],
+    );
+
+    expect(selection.warnings.join(" ")).toContain('excludes package "docker"');
+  });
 });
 
 describe("manifest write-back", () => {
-  test("adds a package to a profile and to common", async () => {
+  test("removing from a wildcard profile adds an exclude", async () => {
     await writeManifest(MANIFEST);
 
-    await addPackageToProfile(fixture.repo, "ghostty", "macbook");
-    await addPackageToProfile(fixture.repo, "starship", COMMON_KEY);
+    await excludePackage(fixture.repo, "brew", "macbook");
 
     const manifest = (await loadManifest(fixture.repo))!;
 
-    expect(manifest.profiles.macbook.packages).toEqual([
-      "brew",
-      "nvim",
-      "ghostty",
-    ]);
-    expect(manifest.common).toEqual(["git", "zsh", "starship"]);
+    expect(manifest.profiles.macbook.exclude).toEqual(["docker", "brew"]);
+    expect(manifest.profiles.macbook.include).toEqual(["*"]);
+  });
+
+  test("adding to a wildcard profile drops the exclude", async () => {
+    await writeManifest(MANIFEST);
+
+    await includePackage(fixture.repo, "docker", "macbook");
+
+    expect(
+      (await loadManifest(fixture.repo))!.profiles.macbook.exclude,
+    ).toEqual([]);
+  });
+
+  // Never leave the manifest saying two things about one package.
+  test("removing from an explicit profile drops it from include", async () => {
+    await writeManifest(MANIFEST);
+
+    await excludePackage(fixture.repo, "docker", "raspberrypi");
+
+    const profile = (await loadManifest(fixture.repo))!.profiles.raspberrypi;
+
+    expect(profile.include).toEqual(["git", "zsh"]);
+    expect(profile.exclude).toEqual([]);
+  });
+
+  test("adding to an explicit profile extends include", async () => {
+    await writeManifest(MANIFEST);
+
+    await includePackage(fixture.repo, "brew", "raspberrypi");
+
+    expect(
+      (await loadManifest(fixture.repo))!.profiles.raspberrypi.include,
+    ).toEqual(["docker", "git", "zsh", "brew"]);
   });
 
   test("is idempotent", async () => {
     await writeManifest(MANIFEST);
 
-    await addPackageToProfile(fixture.repo, "brew", "macbook");
-    await addPackageToProfile(fixture.repo, "brew", "macbook");
+    await excludePackage(fixture.repo, "brew", "macbook");
+    await excludePackage(fixture.repo, "brew", "macbook");
 
     expect(
-      (await loadManifest(fixture.repo))!.profiles.macbook.packages,
-    ).toEqual(["brew", "nvim"]);
+      (await loadManifest(fixture.repo))!.profiles.macbook.exclude,
+    ).toEqual(["docker", "brew"]);
   });
 
-  test("removes a package everywhere", async () => {
-    await writeManifest(MANIFEST);
-
-    await removePackageFromProfile(fixture.repo, "brew");
-
-    const manifest = (await loadManifest(fixture.repo))!;
-
-    expect(manifest.profiles.macbook.packages).toEqual(["nvim"]);
-    expect(manifest.profiles.macmini.packages).toEqual([]);
+  test("rejects an unknown profile", () => {
+    return writeManifest(MANIFEST).then(() =>
+      expect(excludePackage(fixture.repo, "brew", "nope")).rejects.toThrow(
+        /Unknown profile/,
+      ),
+    );
   });
 
   test("refuses to rewrite a manifest containing comments", async () => {
@@ -233,18 +365,21 @@ describe("manifest write-back", () => {
       "// keep me\n" + JSON.stringify(MANIFEST),
     );
 
-    expect(
-      addPackageToProfile(fixture.repo, "ghostty", "macbook"),
-    ).rejects.toThrow(/comments/);
+    expect(excludePackage(fixture.repo, "brew", "macbook")).rejects.toThrow(
+      /comments/,
+    );
   });
 
-  test("writes 2-space JSON with a trailing newline", async () => {
+  test("keeps a default profile as a one-liner and arrays inline", async () => {
     await writeManifest(MANIFEST);
-    await addPackageToProfile(fixture.repo, "ghostty", "macbook");
+    await includePackage(fixture.repo, "docker", "macbook");
 
     const raw = await Bun.file(`${fixture.repo}/dot.json`).text();
 
     expect(raw.endsWith("}\n")).toBe(true);
-    expect(raw).toContain('\n  "common": [');
+    // macbook now has no excludes and includes everything, so neither key is
+    // written: only its description survives.
+    expect(raw).not.toMatch(/"macbook": \{[^}]*"(include|exclude)"/s);
+    expect(raw).toContain('"include": ["docker", "git", "zsh"]');
   });
 });

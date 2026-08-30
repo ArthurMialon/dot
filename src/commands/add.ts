@@ -7,72 +7,15 @@ import * as log from "../tools/logging";
 import { bold } from "../tools/logging";
 import { copyContents, exists } from "../tools/fs";
 import { runLink } from "./link";
-import {
-  COMMON_KEY,
-  addPackageToProfile,
-  loadManifest,
-} from "../tools/profiles";
-import { select } from "../tools/prompt";
 
 export interface AddOptions {
   force?: boolean;
-  profile?: string;
-  common?: boolean;
-  /** Skip recording the package in dot.json. */
-  noProfile?: boolean;
 }
 
 /**
  * A package that exists on disk but in no profile would not be linked, which
  * reads as a bug, so record it as part of adding it.
  */
-const recordInManifest = async (
-  configuration: config.DotConfig,
-  pkg: string,
-  options: AddOptions,
-): Promise<void> => {
-  if (options.noProfile) return;
-
-  const manifest = await loadManifest(configuration.repo);
-
-  if (!manifest) return;
-
-  const known =
-    manifest.common.includes(pkg) ||
-    Object.values(manifest.profiles).some((p) => p.packages.includes(pkg));
-
-  if (known) return;
-
-  let bucket = options.common
-    ? COMMON_KEY
-    : (options.profile ?? (options.force ? configuration.profile : null));
-
-  if (!bucket) {
-    const choices = [
-      ...(configuration.profile
-        ? [
-            {
-              name: `${configuration.profile} (active profile)`,
-              value: configuration.profile,
-            },
-          ]
-        : []),
-      { name: `${COMMON_KEY} (all machines)`, value: COMMON_KEY },
-      ...Object.keys(manifest.profiles)
-        .filter((name) => name !== configuration.profile)
-        .map((name) => ({ name, value: name })),
-      { name: "don't add to dot.json", value: "" },
-    ];
-
-    bucket = await select({ message: `Add package "${pkg}" to:`, choices });
-  }
-
-  if (!bucket) return;
-
-  await addPackageToProfile(configuration.repo, pkg, bucket);
-
-  log.success(`Recorded ${bold(pkg)} in ${bold(bucket)}`);
-};
 
 export const runAdd = async (
   path: string,
@@ -146,8 +89,6 @@ export const runAdd = async (
     process.exit(1);
   }
 
-  await recordInManifest(configuration, pkg, options);
-
   await runLink({ package: pkg, force: true, all: true });
 };
 
@@ -157,9 +98,6 @@ export const addCommand = new Command("add")
   .argument("<path>", "File or folder to add")
   .argument("[package]", "Package it belongs to")
   .option("-f, --force", "Force apply to package without prompt", false)
-  .option("-p, --profile <name>", "Record the package in this profile")
-  .option("--common", "Record the package in the common packages", false)
-  .option("--no-profile", "Do not touch dot.json")
   .action((path: string, pkg: string | undefined, options: AddOptions) =>
     runAdd(path, pkg, options),
   );

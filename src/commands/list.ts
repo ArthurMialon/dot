@@ -5,7 +5,12 @@ import * as config from "../tools/config";
 import * as packages from "../tools/packages";
 import * as log from "../tools/logging";
 import { bold, dim, yellow } from "../tools/logging";
-import { loadManifest, type DotManifest } from "../tools/profiles";
+import {
+  ALL,
+  loadManifest,
+  resolveProfile,
+  type DotManifest,
+} from "../tools/profiles";
 import { resolveSelection } from "./selection";
 
 export interface ListOptions {
@@ -14,18 +19,20 @@ export interface ListOptions {
   all?: boolean;
 }
 
-/** Which profiles (and `common`) a package belongs to. */
-const membership = (manifest: DotManifest, name: string): string[] => {
-  const owners: string[] = [];
-
-  if (manifest.common.includes(name)) owners.push("common");
-
-  for (const [profileName, profile] of Object.entries(manifest.profiles)) {
-    if (profile.packages.includes(name)) owners.push(profileName);
-  }
-
-  return owners;
-};
+/**
+ * Which profiles do NOT link a package. Since a profile takes everything by
+ * default, the exceptions are the interesting part: listing the profiles that
+ * include a package would just repeat every profile name on every row.
+ */
+const excludedFrom = (
+  manifest: DotManifest,
+  name: string,
+  onDisk: string[],
+): string[] =>
+  Object.keys(manifest.profiles).filter(
+    (profileName) =>
+      !resolveProfile(manifest, profileName, onDisk).packages.includes(name),
+  );
 
 export const runList = async (options: ListOptions = {}): Promise<void> => {
   const { verbose = false, profile, all = false } = options;
@@ -63,30 +70,26 @@ export const runList = async (options: ListOptions = {}): Promise<void> => {
   const rows: string[][] = [];
 
   for (const pkg of await packages.list(configuration.repo, { names: shown })) {
-    const owners = membership(manifest, pkg.name);
+    const excluded = excludedFrom(manifest, pkg.name, onDisk);
 
     rows.push([
-      ...renderRow(pkg, verbose, owners, activeProfile ?? undefined),
-      owners.length === 0 ? dim("unassigned") : "",
+      ...renderRow(pkg, verbose, excluded),
+      activeProfile && excluded.includes(activeProfile) ? dim("excluded") : "",
     ]);
   }
 
-  // Declared in the manifest but with no directory on disk.
+  // Named by an explicit include but with no directory on disk.
   if (all) {
-    const declared = new Set([
-      ...manifest.common,
-      ...Object.values(manifest.profiles).flatMap((p) => p.packages),
-    ]);
+    const declared = new Set(
+      Object.values(manifest.profiles).flatMap((profile) =>
+        profile.include.filter((name) => name !== ALL),
+      ),
+    );
 
     for (const name of declared) {
       if (onDisk.includes(name)) continue;
 
-      rows.push([
-        name,
-        membership(manifest, name).join(", "),
-        "–",
-        yellow("missing"),
-      ]);
+      rows.push([name, "–", "–", yellow("missing")]);
     }
   }
 
@@ -95,8 +98,8 @@ export const runList = async (options: ListOptions = {}): Promise<void> => {
 
   const table = new Table({
     head: withStatus
-      ? ["Package", "Profiles", filesColumn, ""]
-      : ["Package", "Profiles", filesColumn],
+      ? ["Package", "Excluded from", filesColumn, ""]
+      : ["Package", "Excluded from", filesColumn],
     style: { head: [] },
   });
 
@@ -116,20 +119,17 @@ export const runList = async (options: ListOptions = {}): Promise<void> => {
 const renderRow = (
   pkg: packages.DotPackage,
   verbose: boolean,
-  owners?: string[],
-  activeProfile?: string,
+  excludedFromProfiles?: string[],
 ): string[] => {
   const files = verbose
     ? pkg.files.map((file) => join(file.directory, file.name)).join("\n")
     : String(pkg.files.length);
 
-  if (!owners) return [bold(pkg.name), files];
+  if (!excludedFromProfiles) return [bold(pkg.name), files];
 
-  const labels = owners.map((owner) =>
-    owner === activeProfile ? `${owner} ✓` : owner,
-  );
-
-  return [bold(pkg.name), labels.join(", ") || "–", files];
+  // No marker for the active profile: the status column already says
+  // "excluded", and repeating it in two places reads as two facts.
+  return [bold(pkg.name), excludedFromProfiles.join(", ") || "–", files];
 };
 
 export const listCommand = new Command("list")
