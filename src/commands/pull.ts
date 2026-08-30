@@ -1,10 +1,11 @@
 import { Command } from "commander";
-import { confirm } from "@inquirer/prompts";
+import { confirm } from "../tools/prompt";
 import * as config from "../tools/config";
 import * as log from "../tools/logging";
 import { bold } from "../tools/logging";
 import * as git from "../tools/git";
 import { runLink } from "./link";
+import { resolveBranch } from "./remote";
 
 export interface PullOptions {
   force?: boolean;
@@ -13,9 +14,10 @@ export interface PullOptions {
 export const runPull = async (options: PullOptions = {}): Promise<void> => {
   const { force = false } = options;
 
-  const { repo } = await config.get();
+  const configuration = await config.get();
+  const { repo } = configuration;
 
-  const branch = await git.getCurrentBranch(repo);
+  const { branch } = await resolveBranch(configuration);
 
   if (!branch) {
     log.error("Cannot read current branch of repository", bold(repo));
@@ -37,6 +39,7 @@ export const runPull = async (options: PullOptions = {}): Promise<void> => {
     (await confirm({
       message: "Do you want to link new changes?",
       default: false,
+      hint: "Re-run with --force to link after pulling.",
     }));
 
   if (!confirmed) {

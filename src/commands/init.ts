@@ -1,17 +1,19 @@
 import { realpath } from "node:fs/promises";
 import { Command } from "commander";
-import { confirm } from "@inquirer/prompts";
+import { confirm } from "../tools/prompt";
 import Dot from "../dot";
 import * as config from "../tools/config";
 import * as log from "../tools/logging";
 import { blue, bold } from "../tools/logging";
 import * as git from "../tools/git";
+import { exists } from "../tools/fs";
 import configEditPrompt from "../prompt/config-edit";
 import { runList } from "./list";
 import { runLink } from "./link";
 
 export interface InitOptions {
   path?: string;
+  branch?: string;
 }
 
 export const runInit = async (
@@ -35,6 +37,7 @@ export const runInit = async (
     const confirmClone = await confirm({
       message: "Clone it as your dotfiles repository?",
       default: false,
+      hint: "Re-run with --yes to accept the defaults.",
     });
 
     if (!confirmClone) {
@@ -42,11 +45,27 @@ export const runInit = async (
       return;
     }
 
-    const cloned = await git.clone(remoteRepository, destination);
+    const reused = await reuseExistingClone(destination, remoteRepository);
 
-    if (!cloned) {
-      log.error(`Failed to clone repository ${remoteRepository}`);
+    if (reused === "conflict") {
+      log.error(`${destination} already exists and is not this repository.`);
+      log.info(
+        `Pick another location with: ${Dot.bin} init <url> --path <dir>`,
+      );
       process.exit(1);
+    }
+
+    if (reused === "clone") {
+      const cloned = await git.clone(
+        remoteRepository,
+        destination,
+        options.branch,
+      );
+
+      if (!cloned) {
+        log.error(`Failed to clone repository ${remoteRepository}`);
+        process.exit(1);
+      }
     }
 
     configuration.repo = await realpath(destination);
@@ -54,11 +73,20 @@ export const runInit = async (
 
   const configPrompt = await configEditPrompt(configuration);
 
+  const remote = await git.getRemoteUrl(configPrompt.repo);
+  const currentBranch = await git.getCurrentBranch(configPrompt.repo);
+  const branch = options.branch ?? (currentBranch || null);
+
   await config.initialize({
     target: configPrompt.target,
     repo: configPrompt.repo,
     initialized: true,
+    remote,
+    branch,
   });
+
+  if (remote) log.info("Remote:", bold(remote));
+  if (branch) log.info("Branch:", bold(branch));
 
   log.success(`\n💪 ${Dot.title} initialized successfully!`);
 
@@ -67,6 +95,7 @@ export const runInit = async (
   const confirmed = await confirm({
     message: "Do you want to link your dotfiles?",
     default: false,
+    hint: "Re-run with --yes to link without asking.",
   });
 
   if (!confirmed) {
@@ -82,6 +111,27 @@ export const runInit = async (
     "\nYour dotfiles are now linked to your target",
     bold(configurationReady.target),
   );
+};
+
+/**
+ * Never clone on top of existing content: reuse the directory when it already
+ * is this repository, otherwise let the caller bail out.
+ */
+const reuseExistingClone = async (
+  destination: string,
+  remoteRepository: string,
+): Promise<"clone" | "reuse" | "conflict"> => {
+  if (!(await exists(destination))) return "clone";
+
+  if (!(await git.isRepository(destination))) return "conflict";
+
+  const origin = await git.getRemoteUrl(destination);
+
+  if (origin !== remoteRepository) return "conflict";
+
+  log.info("Already cloned, reusing", bold(destination));
+
+  return "reuse";
 };
 
 export const initCommand = new Command("init")

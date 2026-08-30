@@ -13,6 +13,7 @@ import { addCommand } from "./commands/add";
 import { statusCommand } from "./commands/status";
 import { pullCommand } from "./commands/pull";
 import { pushCommand } from "./commands/push";
+import { remoteCommand } from "./commands/remote";
 
 const program = new Command()
   .name(Dot.bin)
@@ -32,6 +33,7 @@ program
   .addCommand(addCommand)
   .addCommand(statusCommand)
   .addCommand(pullCommand)
-  .addCommand(pushCommand);
+  .addCommand(pushCommand)
+  .addCommand(remoteCommand);
 
 await program.parseAsync(process.argv);

@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { confirm } from "@inquirer/prompts";
+import { confirm } from "../tools/prompt";
 import * as config from "../tools/config";
 import * as packages from "../tools/packages";
 import * as log from "../tools/logging";
@@ -35,6 +35,7 @@ export const runUnlink = async (options: UnlinkOptions = {}): Promise<void> => {
     const confirmed = await confirm({
       message: `Unlink ${filteredPkgs.length} package(s)?`,
       default: false,
+      hint: "Re-run with --force to unlink without asking.",
     });
 
     if (!confirmed) return;

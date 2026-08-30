@@ -1,7 +1,7 @@
 import { mkdir, realpath, stat } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { Command } from "commander";
-import { confirm, input } from "@inquirer/prompts";
+import { confirm, input } from "../tools/prompt";
 import * as config from "../tools/config";
 import * as log from "../tools/logging";
 import { bold } from "../tools/logging";
@@ -54,7 +54,11 @@ export const runAdd = async (
 
   const confirmed =
     force ||
-    (await confirm({ message: "Do you want to continue?", default: false }));
+    (await confirm({
+      message: "Do you want to continue?",
+      default: false,
+      hint: "Re-run with --force to add without asking.",
+    }));
 
   if (!confirmed) {
     log.info("Aborted.");

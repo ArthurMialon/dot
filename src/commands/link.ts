@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { Command } from "commander";
-import { confirm } from "@inquirer/prompts";
+import { confirm } from "../tools/prompt";
 import * as config from "../tools/config";
 import * as packages from "../tools/packages";
 import * as log from "../tools/logging";
@@ -36,6 +36,7 @@ export const runLink = async (options: LinkOptions = {}): Promise<void> => {
     const confirmed = await confirm({
       message: `Apply ${filteredPkgs.length} package(s)?`,
       default: false,
+      hint: "Re-run with --force to apply without asking.",
     });
 
     if (!confirmed) return;

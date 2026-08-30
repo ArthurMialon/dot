@@ -1,5 +1,5 @@
 import { realpath } from "node:fs/promises";
-import { input } from "@inquirer/prompts";
+import { input } from "../tools/prompt";
 import type { DotConfig } from "../tools/config";
 import { exists } from "../tools/fs";
 

@@ -1,15 +1,23 @@
 import { Command } from "commander";
-import { confirm, input } from "@inquirer/prompts";
+import { confirm, input } from "../tools/prompt";
 import * as config from "../tools/config";
 import * as log from "../tools/logging";
-import { bold } from "../tools/logging";
+import { bold, yellow } from "../tools/logging";
 import * as git from "../tools/git";
 import { runStatus } from "./status";
+import { resolveBranch } from "./remote";
 
 const toISODate = (date: Date): string => date.toISOString().split("T")[0];
 
-export const runPush = async (): Promise<void> => {
-  const { repo } = await config.get();
+export interface PushOptions {
+  force?: boolean;
+}
+
+export const runPush = async (options: PushOptions = {}): Promise<void> => {
+  const { force = false } = options;
+
+  const configuration = await config.get();
+  const { repo } = configuration;
 
   const changes = await runStatus({ exitWhenClean: false });
 
@@ -18,11 +26,34 @@ export const runPush = async (): Promise<void> => {
     return;
   }
 
-  const branch = await git.getCurrentBranch(repo);
+  const { branch, current, diverged } = await resolveBranch(configuration);
 
   if (!branch) {
     log.error("Cannot read current branch of repository", bold(repo));
     process.exit(1);
+  }
+
+  // Pushing the configured branch while HEAD is elsewhere succeeds without
+  // carrying the work that was just committed, so never do it silently.
+  if (diverged) {
+    log.info(
+      yellow("⚠"),
+      `Configured branch is ${bold(branch)} but the repository is on ${bold(current)}.`,
+    );
+    log.info(`  Pushing ${bold(branch)} will not include your current work.`);
+
+    if (!force) {
+      const proceed = await confirm({
+        message: "Continue?",
+        default: false,
+        hint: "Re-run with --force to push the configured branch anyway.",
+      });
+
+      if (!proceed) {
+        log.info("Push aborted");
+        return;
+      }
+    }
   }
 
   const prefix = "chore:";
@@ -42,6 +73,7 @@ export const runPush = async (): Promise<void> => {
   const confirmed = await confirm({
     message: "Do you want to commit and push the changes?",
     default: false,
+    hint: "Push needs an interactive terminal to confirm the commit.",
   });
 
   if (!confirmed) {
@@ -58,6 +90,7 @@ export const runPush = async (): Promise<void> => {
 
 export const pushCommand = new Command("push")
   .description("Publish new version of your dotfiles")
-  .action(runPush);
+  .option("-f, --force", "Skip the branch divergence prompt", false)
+  .action((options: PushOptions) => runPush(options));
 
 export default pushCommand;

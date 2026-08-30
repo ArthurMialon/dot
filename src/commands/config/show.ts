@@ -11,6 +11,9 @@ export const showConfig = async (): Promise<void> => {
     ["Config location", configuration.configPath],
     ["Dotfiles", configuration.repo],
     ["Target", configuration.target],
+    ["Profile", configuration.profile ?? "–"],
+    ["Remote", configuration.remote ?? "–"],
+    ["Branch", configuration.branch ?? "– (uses current branch)"],
   );
 
   log.info(table.toString());

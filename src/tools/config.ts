@@ -8,6 +8,13 @@ export interface DotConfig {
   repo: string;
   target: string;
   initialized: boolean;
+
+  /** Active profile name. null means no profile: every package is linked. */
+  profile: string | null;
+  /** Git remote URL for origin. null when unknown or local-only. */
+  remote: string | null;
+  /** Branch push/pull operate on. null means the checked-out branch. */
+  branch: string | null;
 }
 
 export const defaultConfig: DotConfig = {
@@ -20,6 +27,12 @@ export const defaultConfig: DotConfig = {
   // dotfiles configuration
   repo: Dot.defaultRepo,
   target: Dot.defaultTarget,
+
+  // Defaults are null so an existing config file, which get() merges over
+  // defaultConfig, keeps behaving exactly as it did before these keys existed.
+  profile: null,
+  remote: null,
+  branch: null,
 };
 
 export const get = async (
