@@ -1,8 +1,7 @@
-import { homedir } from "node:os";
 import { join } from "node:path";
 import Dot from "../dot";
 import type { DotConfig } from "./config";
-import { exists } from "./fs";
+import { PathExpansionError, exists, expandPath } from "./fs";
 
 export interface DotProfile {
   /** Free text shown by `dot profile list`. */
@@ -184,25 +183,17 @@ export const resolveTarget = (
 
   if (!target) return undefined;
 
-  const expanded = target
-    .replace(/^~(?=\/|$)/, homedir())
-    .replace(
-      /\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g,
-      (_match, braced: string | undefined, bare: string | undefined) => {
-        const name = braced ?? bare ?? "";
-        const value = process.env[name];
+  try {
+    return expandPath(target);
+  } catch (error) {
+    if (error instanceof PathExpansionError) {
+      throw new ManifestError(
+        `Profile target "${target}" refers to $${error.variable}, which is not set.`,
+      );
+    }
 
-        if (value === undefined) {
-          throw new ManifestError(
-            `Profile target "${target}" refers to $${name}, which is not set.`,
-          );
-        }
-
-        return value;
-      },
-    );
-
-  return expanded;
+    throw error;
+  }
 };
 
 const levenshtein = (a: string, b: string): number => {

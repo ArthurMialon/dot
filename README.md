@@ -25,6 +25,7 @@
   - [Push](#push)
   - [Pull](#pull)
   - [Upgrade](#upgrade)
+  - [Completion](#completion)
 - [Ignore](#ignore-folder-and-files)
 - [Upgrading from 0.x](#upgrading-from-0x)
 - [Development](#development)
@@ -164,6 +165,8 @@ dot init
 `dot init` sets up the **dotfiles location** and the **target** (default:
 `$HOME`), records the remote and branch, and — when the repository has a
 `dot.json` — asks which profile this machine is.
+
+Path prompts complete with **Tab** and understand `~` and `$VAR`.
 
 ## Commands
 
@@ -381,6 +384,31 @@ dot upgrade
 
 ---
 
+### Completion
+
+Shell completion for sub-commands, package names and profile names.
+
+```bash
+# zsh — add to ~/.zshrc
+eval "$(dot completion zsh)"
+
+# bash — add to ~/.bashrc
+eval "$(dot completion bash)"
+```
+
+```
+$ dot link <TAB>
+brew   docker   git   nvim   zsh
+
+$ dot profile use <TAB>
+macbook   macmini   raspberrypi
+```
+
+Package and profile names are read from your repository as you press Tab, so
+they stay current without regenerating anything.
+
+---
+
 ## Ignore folder and files
 
 Create a `.dotignore` file to avoid linking some files or folders. It follows
@@ -408,6 +436,8 @@ linked.
   expected. It reports it and moves on.
 - Prompts fail with an explanation instead of hanging when there is no terminal,
   so `--force` / `--yes` are required in scripts and cron jobs.
+- Ctrl+C at a prompt now prints `Aborted.` and exits 130 instead of a stack
+  trace.
 - Everything else is unchanged: `~/.dot/config` keeps its format and gains three
   optional keys, and a repository without `dot.json` behaves exactly as before.
 
