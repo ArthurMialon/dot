@@ -1,32 +1,27 @@
-import { exists } from "@std/fs";
-import { Input } from "@cliffy/prompt";
-import { DotConfig } from "../tools/config.ts";
-import * as log from "../tools/logging.ts";
+import { realpath } from "node:fs/promises";
+import { input } from "../tools/prompt";
+import type { DotConfig } from "../tools/config";
+import { exists } from "../tools/fs";
 
-const validatePath = async (value: string) => {
-  if (!(await exists(value))) {
-    log.info("\nThis path does not exist");
-    return false;
-  }
-  return true;
-};
+const validatePath = async (value: string) =>
+  (await exists(value)) || "This path does not exist";
 
 export default async (configuration: DotConfig) => {
-  const targetLocationPrompt = await Input.prompt({
+  const targetLocationPrompt = await input({
     message: "Target location for symlinks",
     default: configuration.target,
     validate: validatePath,
   });
 
-  const targetLocation = await Deno.realPath(targetLocationPrompt);
+  const targetLocation = await realpath(targetLocationPrompt);
 
-  const dotfilesLocationPrompt = await Input.prompt({
+  const dotfilesLocationPrompt = await input({
     message: "Dotfiles repository location",
     default: configuration.repo,
     validate: validatePath,
   });
 
-  const dotfilesLocation = await Deno.realPath(dotfilesLocationPrompt);
+  const dotfilesLocation = await realpath(dotfilesLocationPrompt);
 
   return {
     target: targetLocation,

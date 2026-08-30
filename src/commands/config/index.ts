@@ -1,27 +1,10 @@
-import { Command } from "@cliffy/command";
-import { Table } from "@cliffy/table";
-import * as log from "../../tools/logging.ts";
-import { get } from "../../tools/config.ts";
-import edit from "./edit.ts";
+import { Command } from "commander";
+import { configEditCommand } from "./edit";
+import { showConfig } from "./show";
 
-const displayConfig = async () => {
-  const configuration = await get();
-
-  const table = new Table();
-
-  table
-    .border(true)
-    .header(["Key", "Value"])
-    .body([
-      ["Config location", configuration.configPath],
-      ["Dotfiles", configuration.repo],
-      ["Target", configuration.target],
-    ]);
-
-  log.info(table.toString());
-};
-
-export default new Command()
+export const configCommand = new Command("config")
   .description("Manage the configuration")
-  .action(displayConfig)
-  .command("edit", edit);
+  .action(showConfig)
+  .addCommand(configEditCommand);
+
+export default configCommand;

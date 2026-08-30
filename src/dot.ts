@@ -1,3 +1,6 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
+
 interface DotCLI {
   title: string;
   bin: string;
@@ -11,20 +14,25 @@ interface DotCLI {
   defaultRepo: string;
   defaultTarget: string;
   ignoreFileName: string;
+  manifestFileName: string;
   installScript: string;
 }
 
-const CONFIG_DIR = `${Deno.env.get("HOME")}/.dot`;
-const CONFIG_PATH = `${CONFIG_DIR}/config`;
+const HOME = homedir();
 
-const DEFAULT_REPO = `${Deno.env.get("HOME")}/dotfiles`;
-const DEFAULT_TARGET = `${Deno.env.get("HOME")}`;
+const CONFIG_DIR = join(HOME, ".dot");
+const CONFIG_PATH = join(CONFIG_DIR, "config");
+
+const DEFAULT_REPO = join(HOME, "dotfiles");
+const DEFAULT_TARGET = HOME;
 
 const owner = "arthurmialon";
 const repository = "dot";
 
-const installScript =
-  `https://raw.githubusercontent.com/${owner}/${repository}/main/install.sh`;
+const installScript = `https://raw.githubusercontent.com/${owner}/${repository}/main/install.sh`;
+
+// Replaced at build time by `bun build --define process.env.DOT_VERSION=...`
+const version = process.env.DOT_VERSION ?? "0.0.0-dev";
 
 const Dot: DotCLI = {
   title: "Dot CLI",
@@ -34,12 +42,13 @@ const Dot: DotCLI = {
   owner,
   github: `https://github.com/${owner}/${repository}`,
   installScript,
-  version: "__VERSION__",
+  version,
   configPath: CONFIG_PATH,
   configDirectory: CONFIG_DIR,
   defaultRepo: DEFAULT_REPO,
   defaultTarget: DEFAULT_TARGET,
   ignoreFileName: ".dotignore",
+  manifestFileName: "dot.json",
 };
 
 export default Dot;

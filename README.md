@@ -1,7 +1,7 @@
 # Dot.
 
-👉 A CLI to manage your Dotfiles built with [Deno 2](https://deno.com/) and
-[Cliffy](https://cliffy.io/) inspired by
+👉 A CLI to manage your Dotfiles built with [Bun](https://bun.sh/) and
+[Commander](https://github.com/tj/commander.js) inspired by
 [GNU Stow](https://www.gnu.org/software/stow/)
 
 ## Table of Contents
@@ -9,12 +9,15 @@
 - [Demo](#demo)
 - [Installation](#installation)
 - [Concepts](#concepts)
+  - [Profiles](#profiles)
 - [Features](#features)
 - [Getting Started](#getting-started)
 - [Commands](#commands)
   - [Init](#init)
   - [Link](#link)
   - [Unlink](#unlink)
+  - [Profile](#profile)
+  - [Remote](#remote)
   - [Config](#config)
   - [Add](#add)
   - [Edit](#edit)
@@ -22,7 +25,9 @@
   - [Push](#push)
   - [Pull](#pull)
   - [Upgrade](#upgrade)
-- [Ignore](#ignore)
+- [Ignore](#ignore-folder-and-files)
+- [Upgrading from 0.x](#upgrading-from-0x)
+- [Development](#development)
 
 ## Demo
 
@@ -30,7 +35,9 @@ https://github.com/user-attachments/assets/f6ea3f99-7115-408a-bc6d-23a0f29378b4
 
 ## Installation
 
-`curl -fsSL https://raw.githubusercontent.com/arthurmialon/dot/main/install.sh | bash`
+`curl -fsSL https://raw.githubusercontent.com/arthurmialon/dot/main/install.sh | sh`
+
+> Linux and macOS, on x64 and arm64. A Raspberry Pi needs a **64-bit** OS.
 
 ## Concepts
 
@@ -44,31 +51,31 @@ Examples of structure:
 ```
 # Dotfiles repository
 ├── aws (package)
-│   └── .aws
-│       ├── cli
-│       │   └── alias
-│       ├── config
+│   └── .aws
+│       ├── cli
+│       │   └── alias
+│       ├── config
 ├── brew (package)
-│   └── Brewfile
+│   └── Brewfile
 ├── git (package)
-│   ├── .gitconfig
-│   └── .gitignore
+│   ├── .gitconfig
+│   └── .gitignore
 ├── npm (package)
-│   └── .npmrc
+│   └── .npmrc
 ├── starship (package)
-│   └── .config
-│       └── starship.toml
+│   └── .config
+│       └── starship.toml
 ├── vim (package)
-│   └── .vimrc
+│   └── .vimrc
 ├── zed (package)
-│   └── .config
-│       └── zed
-│           ├── keymap.json
-│           └── settings.json
+│   └── .config
+│       └── zed
+│           ├── keymap.json
+│           └── settings.json
 └── zsh (package)
     ├── .config
-    │   └── zsh
-    │       └── functions.zsh
+    │   └── zsh
+    │       └── functions.zsh
     └── .zshrc
 ```
 
@@ -83,13 +90,60 @@ Example for the **ZSH** package:
 ~/.config/zsh/functions.zsh -> dotfiles/zsh/.config/zsh/functions.zsh
 ```
 
+### Profiles
+
+One dotfiles repository, several machines. Declare a `dot.json` at its root:
+
+```json
+{
+  "version": 1,
+  "common": ["git", "zsh", "starship", "vim"],
+  "profiles": {
+    "macbook": {
+      "description": "Work MacBook Pro",
+      "packages": ["aws", "brew", "npm", "zed"]
+    },
+    "macmini": {
+      "description": "Home Mac Mini",
+      "packages": ["brew", "npm", "zed"]
+    },
+    "raspberrypi": {
+      "description": "Raspberry Pi 5, headless",
+      "target": "/home/pi",
+      "packages": ["docker"]
+    }
+  }
+}
+```
+
+Every profile links the `common` packages **plus** its own, so a package shared
+by two machines is written once and listed in both. A profile may set its own
+`target`, which is applied when you select it.
+
+Pick one per machine:
+
+```bash
+dot init git@github.com:me/dotfiles.git --profile raspberrypi --yes  # at install
+dot profile                     # which profile is this machine on?
+dot profile list                # every profile and its package count
+dot profile use macbook         # switch, unlinking what is no longer needed
+dot link --profile macmini      # one-shot, nothing is persisted
+dot list --all                  # every package and the profiles it belongs to
+```
+
+**No `dot.json`? Nothing changes** — every package is linked, exactly as before.
+Create one from what you already have with `dot profile init`.
+
 ## Features
 
 - Link all your dotfiles automatically to any directory (default is `$HOME`)
+- Target a profile per machine (MacBook, Mac Mini, Raspberry Pi…) so each one
+  only links the packages it needs
 - Unlink your dotfiles with a simple command so you can easily switch between
   configurations
-- Add new files or folders to your dotfiles from local directory
-- Quickly open editor to edit your dotfiles
+- Add new files or folders to your dotfiles from a local directory
+- Remember your remote and branch so `push` and `pull` always use the right one
+- Quickly open your editor to edit your dotfiles
 
 ## Getting Started
 
@@ -99,18 +153,17 @@ Example for the **ZSH** package:
 dot init git@github.com:<USERNAME>/dotfiles.git
 ```
 
+It is cloned into `~/dotfiles` (override with `--path`).
+
 **Local repository**
 
 ```bash
 dot init
 ```
 
-`dot init` setup the **dotfiles location** and the **target** (default:
-`$HOME`).
-
-The Dot CLI will ask you to set the paths to your dotfiles repository and the
-target directory. Then it reads the packages and files from your dotfiles
-repository and link them to the target directory.
+`dot init` sets up the **dotfiles location** and the **target** (default:
+`$HOME`), records the remote and branch, and — when the repository has a
+`dot.json` — asks which profile this machine is.
 
 ## Commands
 
@@ -121,24 +174,38 @@ command.
 
 ### Init
 
-Basic setup. Ask you to set locations to your dotfiles and the target location.
+Basic setup. Asks you to set locations to your dotfiles and the target location.
 
 ```bash
 dot init
 ```
 
-**With arguments:** You can clone your dotfiles repository and link all
-packages.
+**With arguments:** clone your dotfiles repository and link its packages.
 
 ```bash
 dot init git@github.com:ArthurMialon/dotfiles.git
+```
+
+**Options:**
+
+- `--path <dir>` clone destination (default: `~/dotfiles`)
+- `-b, --branch <name>` branch to clone and record
+- `-p, --profile <name>` profile to activate, skipping the prompt
+- `-t, --target <path>` symlink target, skipping the prompt
+- `-y, --yes` accept the defaults without prompting
+
+Unattended install, for a headless machine:
+
+```bash
+dot init git@github.com:me/dotfiles.git --profile raspberrypi --yes
 ```
 
 ---
 
 ### Link
 
-Link all packages to your `$HOME` directory (can be update with configuration).
+Link the packages of your active profile to your `$HOME` directory (can be
+changed with the configuration).
 
 **Basic:**
 
@@ -146,16 +213,17 @@ Link all packages to your `$HOME` directory (can be update with configuration).
 dot link
 ```
 
-**Aliases:**
-
-- `dot l`
+**Aliases:** `dot l`
 
 **Options:**
 
-- `-v, --verbose` is used to show more information about the process.
-- `-f, --force` to avoid prompt
+- `-v, --verbose` show more information about the process
+- `-f, --force` skip the prompt
+- `-p, --profile <name>` use a specific profile for this run
+- `--all` ignore profile filtering
+- `--prune` unlink packages outside the selection first
 
-**With arguments:** Link only a specific pacakge.
+**With arguments:** link only a specific package.
 
 ```bash
 dot link zsh
@@ -165,30 +233,53 @@ dot link zsh
 
 ### Unlink
 
-Since `dot link` create symlink for all your pacakges, you can use `dot unlink`
-to remove the symlinks.
-
-**Basic:**
+Since `dot link` creates symlinks for your packages, you can use `dot unlink`
+to remove them.
 
 ```bash
 dot unlink
 ```
 
-**Aliases:**
+**Aliases:** `dot u`, `dot remove`
 
-- `dot u`
-- `dot remove`
+**Options:** `-v, --verbose`, `-f, --force`, `-p, --profile <name>`, `--all`
 
-**Options:**
+> `unlink` only ever removes symlinks that point into your dotfiles repository.
+> A real file, or a symlink managed by something else, is reported and left
+> alone.
 
-- `-v, --verbose` is used to show more information about the process.
-- `-f, --force` to avoid prompt
+---
 
-**With arguments:** Link only a specific pacakge.
+### Profile
 
 ```bash
-dot unlink zsh
+dot profile                    # the active profile and its packages
+dot profile list               # every profile declared in dot.json
+dot profile use <name>         # switch profile and relink
+dot profile add <package>      # record a package in a profile
+dot profile remove <package>   # remove a package from a profile
+dot profile init               # create dot.json from the packages on disk
 ```
+
+`dot profile use` prints what it will link and unlink before doing anything.
+Use `--dry-run` to stop there, `-f` to skip the confirmation, and
+`--no-unlink` to keep the links from the previous profile.
+
+`profile add` and `profile remove` accept `-p, --profile <name>` or `--common`.
+
+---
+
+### Remote
+
+```bash
+dot remote                              # configured remote and branch
+dot remote set <url> [-b <branch>]      # update git origin and remember it
+dot remote branch <name>                # change the branch push/pull use
+```
+
+`push` and `pull` use the configured branch when there is one, otherwise the
+branch you have checked out. If the two differ, `push` warns before continuing,
+because pushing the configured branch would not include your current work.
 
 ---
 
@@ -196,44 +287,46 @@ dot unlink zsh
 
 Show the current configuration.
 
-**Basic:**
-
 ```bash
 dot config
 ```
 
-Edit the current configuration (source and target).
+Edit it (dotfiles location and target).
 
 ```bash
 dot config edit
+```
+
+The configuration lives in `~/.dot/config`:
+
+```json
+{
+  "initialized": true,
+  "repo": "/home/pi/dotfiles",
+  "target": "/home/pi",
+  "profile": "raspberrypi",
+  "remote": "git@github.com:arthurmialon/dotfiles.git",
+  "branch": "main"
+}
 ```
 
 ---
 
 ### Add
 
-Add new files or folder to your dotfiles. It adds the requested files to your
-packages and update to symlink.
-
-**Basic:**
+Add new files or folders to your dotfiles. It copies them into a package and
+updates the symlink.
 
 ```bash
-dot add .
-```
-
-Add a the current folder to a specific package (if not exist, the package will
-be created).
-
-```bash
-dot add . zsh
-```
-
-Add a specific to a specific package (if not exist, the package will be
-created).
-
-```bash
+dot add .              # the current folder
+dot add . zsh          # into a specific package (created if missing)
 dot add .zshrc zsh
 ```
+
+**Options:** `-f, --force`, `-p, --profile <name>`, `--common`, `--no-profile`
+
+When the repository has a `dot.json`, a brand new package is recorded in a
+profile, otherwise it would be created and then never linked.
 
 ---
 
@@ -241,23 +334,18 @@ dot add .zshrc zsh
 
 Open the dotfiles repository in your default editor.
 
-**Basic:**
-
 ```bash
 dot edit
+dot edit zsh       # open a single package
 ```
 
-**Aliases:**
-
-- `dot open`
+**Aliases:** `dot open`
 
 ---
 
 ### Status
 
-Check status of your dotfiles repository.
-
-**Basic:**
+Check the status of your dotfiles repository.
 
 ```bash
 dot status
@@ -269,8 +357,6 @@ dot status
 
 Push updates to your remote dotfiles repository.
 
-**Basic:**
-
 ```bash
 dot push
 ```
@@ -279,9 +365,7 @@ dot push
 
 ### Pull
 
-Pull updates from your remote dotfiles repository and link files.
-
-**Basic:**
+Pull updates from your remote dotfiles repository and link the files.
 
 ```bash
 dot pull
@@ -291,8 +375,6 @@ dot pull
 
 ### Upgrade
 
-You can upgrade the Dot CLI with the following command.
-
 ```bash
 dot upgrade
 ```
@@ -301,9 +383,9 @@ dot upgrade
 
 ## Ignore folder and files
 
-Create a `.dotignore` file to avoid link some files or folders. It follows the
-same rules as `.gitignore`. By default it always ignore the `.git` folder and
-the `.dotignore` file.
+Create a `.dotignore` file to avoid linking some files or folders. It follows
+the same rules as `.gitignore`. By default it always ignores the `.git` folder
+and the `.dotignore` file.
 
 ```text
 # Example
@@ -314,3 +396,37 @@ the `.dotignore` file.
 # Ignore the script
 scripts/
 ```
+
+`dot.json` at the repository root is a manifest, not a package, so it is never
+linked.
+
+## Upgrading from 0.x
+
+- `dot init <url>` now clones into `~/dotfiles` instead of the current working
+  directory. Pass `--path ./dotfiles` for the old behaviour.
+- `dot unlink` no longer deletes a real file that sits where a symlink was
+  expected. It reports it and moves on.
+- Prompts fail with an explanation instead of hanging when there is no terminal,
+  so `--force` / `--yes` are required in scripts and cron jobs.
+- Everything else is unchanged: `~/.dot/config` keeps its format and gains three
+  optional keys, and a repository without `dot.json` behaves exactly as before.
+
+## Development
+
+Requires [Bun](https://bun.sh/).
+
+```bash
+bun install
+bun run dev --help     # run from source
+bun test               # test suite
+bun run typecheck      # tsc --noEmit
+bun run lint           # eslint
+bun run format         # prettier
+
+# compile a binary for the current platform
+COMPILE_TARGET=bun-linux-x64 COMPILE_NAME=dot-linux-x64 bun run build
+```
+
+Releases are built by GitHub Actions for `darwin-arm64`, `darwin-x64`,
+`linux-x64` and `linux-arm64`, and published as GitHub Release binaries that
+`install.sh` and `dot upgrade` download.
