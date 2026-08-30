@@ -17,6 +17,7 @@ import { remoteCommand } from "./commands/remote";
 import { profileCommand } from "./commands/profile/index";
 import { ManifestError } from "./tools/profiles";
 import * as log from "./tools/logging";
+import { dim } from "./tools/logging";
 
 const program = new Command()
   .name(Dot.bin)
@@ -40,9 +41,25 @@ program
   .addCommand(remoteCommand)
   .addCommand(profileCommand);
 
+/**
+ * Matched by name rather than instanceof: a second copy of @inquirer/core in the
+ * dependency tree would silently break the instance check and bring the stack
+ * trace back.
+ */
+const isPromptCancellation = (error: unknown): boolean =>
+  error instanceof Error &&
+  (error.name === "ExitPromptError" || error.name === "AbortPromptError");
+
 try {
   await program.parseAsync(process.argv);
 } catch (error) {
+  // Ctrl+C at a prompt is a normal way to leave, not a crash.
+  if (isPromptCancellation(error)) {
+    log.info(dim("Aborted."));
+    // 128 + SIGINT, so a cancelled run does not look like success to a script.
+    process.exit(130);
+  }
+
   // dot.json problems are user-facing configuration errors, never stack traces.
   if (error instanceof ManifestError) {
     log.error(error.message);

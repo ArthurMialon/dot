@@ -26,7 +26,6 @@
   - [Pull](#pull)
   - [Upgrade](#upgrade)
 - [Ignore](#ignore-folder-and-files)
-- [Upgrading from 0.x](#upgrading-from-0x)
 - [Development](#development)
 
 ## Demo
@@ -164,6 +163,8 @@ dot init
 `dot init` sets up the **dotfiles location** and the **target** (default:
 `$HOME`), records the remote and branch, and — when the repository has a
 `dot.json` — asks which profile this machine is.
+
+Path prompts complete with **Tab** and understand `~` and `$VAR`.
 
 ## Commands
 
@@ -399,17 +400,6 @@ scripts/
 
 `dot.json` at the repository root is a manifest, not a package, so it is never
 linked.
-
-## Upgrading from 0.x
-
-- `dot init <url>` now clones into `~/dotfiles` instead of the current working
-  directory. Pass `--path ./dotfiles` for the old behaviour.
-- `dot unlink` no longer deletes a real file that sits where a symlink was
-  expected. It reports it and moves on.
-- Prompts fail with an explanation instead of hanging when there is no terminal,
-  so `--force` / `--yes` are required in scripts and cron jobs.
-- Everything else is unchanged: `~/.dot/config` keeps its format and gains three
-  optional keys, and a repository without `dot.json` behaves exactly as before.
 
 ## Development
 
