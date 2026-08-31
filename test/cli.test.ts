@@ -78,6 +78,43 @@ describe("cli wiring", () => {
     expect(code).not.toBe(0);
   });
 
+  // A mistyped command used to be reported as an argument of the bare program:
+  // "too many arguments. Expected 0 arguments but got 1: profiles."
+  test("a mistyped command is reported by name, with the help", async () => {
+    const { code, stderr } = await runCli(["profiles"]);
+
+    expect(code).toBe(1);
+    expect(stderr).toContain("unknown command 'profiles'");
+    expect(stderr).toContain("Did you mean profile?");
+    expect(stderr).toContain("Usage:");
+    expect(stderr).not.toContain("too many arguments");
+  });
+
+  test("a mistyped subcommand is reported by name", async () => {
+    for (const group of ["profile", "config", "remote"]) {
+      const { code, stderr } = await runCli([group, "nope-not-here"]);
+
+      expect(code).toBe(1);
+      expect(stderr).toContain("unknown command 'nope-not-here'");
+      expect(stderr).toContain("Usage:");
+    }
+  });
+
+  test("a mistyped subcommand suggests the closest one", async () => {
+    const { code, stderr } = await runCli(["profile", "lst"]);
+
+    expect(code).toBe(1);
+    expect(stderr).toContain("Did you mean list?");
+  });
+
+  // Accepting excess arguments on the groups must not loosen their leaves.
+  test("a leaf command still checks its argument count", async () => {
+    const { code, stderr } = await runCli(["profile", "list", "extra"]);
+
+    expect(code).toBe(1);
+    expect(stderr).toContain("too many arguments");
+  });
+
   test("bare invocation prints help and exits 0", async () => {
     const { code, stdout } = await runCli([]);
 

@@ -2,6 +2,7 @@ import { join } from "node:path";
 import Dot from "../dot";
 import type { DotConfig } from "./config";
 import { PathExpansionError, exists, expandPath } from "./fs";
+import { closest } from "./text";
 
 export interface DotProfile {
   /** Free text shown by `dot profile list`. */
@@ -259,23 +260,6 @@ export const resolveTarget = (
   }
 };
 
-const levenshtein = (a: string, b: string): number => {
-  const rows = Array.from({ length: b.length + 1 }, (_, i) => [i]);
-
-  for (let j = 0; j <= a.length; j++) rows[0][j] = j;
-
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      rows[i][j] =
-        b[i - 1] === a[j - 1]
-          ? rows[i - 1][j - 1]
-          : 1 + Math.min(rows[i - 1][j - 1], rows[i][j - 1], rows[i - 1][j]);
-    }
-  }
-
-  return rows[b.length][a.length];
-};
-
 export interface ResolvedProfile {
   name: string;
   description?: string;
@@ -300,9 +284,7 @@ export const resolveProfile = (
   if (!profile) {
     const available = Object.keys(manifest.profiles);
 
-    const suggestion = available.find(
-      (candidate) => levenshtein(candidate, name) <= 2,
-    );
+    const suggestion = closest(name, available);
 
     throw new ManifestError(
       `Unknown profile "${name}".`,
