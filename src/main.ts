@@ -15,6 +15,7 @@ import { pullCommand } from "./commands/pull";
 import { pushCommand } from "./commands/push";
 import { remoteCommand } from "./commands/remote";
 import { profileCommand } from "./commands/profile/index";
+import { groupAction } from "./tools/command";
 import { ManifestError } from "./tools/profiles";
 import * as log from "./tools/logging";
 import { dim } from "./tools/logging";
@@ -23,8 +24,7 @@ const program = new Command()
   .name(Dot.bin)
   .description(Dot.description)
   .version(Dot.version, "-V, --version", "Show the version")
-  .showHelpAfterError()
-  .action(() => program.outputHelp());
+  .showHelpAfterError();
 
 program
   .addCommand(initCommand)
@@ -40,6 +40,9 @@ program
   .addCommand(pushCommand)
   .addCommand(remoteCommand)
   .addCommand(profileCommand);
+
+// Registered last so an unknown name is matched against every command above.
+groupAction(program, () => program.outputHelp());
 
 /**
  * Matched by name rather than instanceof: a second copy of @inquirer/core in the

@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { groupAction } from "../../tools/command";
 import { runProfileShow } from "./show";
 import { runProfileList } from "./list";
 import { profileUseCommand } from "./use";
@@ -12,13 +13,15 @@ const profileListCommand = new Command("list")
   .description("List the profiles declared in dot.json")
   .action(runProfileList);
 
-export const profileCommand = new Command("profile")
-  .description("Manage the profile used on this machine")
-  .action(runProfileShow)
-  .addCommand(profileListCommand)
-  .addCommand(profileUseCommand)
-  .addCommand(profileAddCommand)
-  .addCommand(profileRemoveCommand)
-  .addCommand(profileInitCommand);
+export const profileCommand = groupAction(
+  new Command("profile")
+    .description("Manage the profile used on this machine")
+    .addCommand(profileListCommand)
+    .addCommand(profileUseCommand)
+    .addCommand(profileAddCommand)
+    .addCommand(profileRemoveCommand)
+    .addCommand(profileInitCommand),
+  runProfileShow,
+);
 
 export default profileCommand;

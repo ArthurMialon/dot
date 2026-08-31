@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import Table from "cli-table3";
+import { groupAction } from "../tools/command";
 import * as config from "../tools/config";
 import * as git from "../tools/git";
 import * as log from "../tools/logging";
@@ -110,10 +111,12 @@ const remoteBranchCommand = new Command("branch")
   .argument("<name>", "Branch name")
   .action((name: string) => runRemoteBranch(name));
 
-export const remoteCommand = new Command("remote")
-  .description("Manage the remote of your dotfiles repository")
-  .action(runRemoteShow)
-  .addCommand(remoteSetCommand)
-  .addCommand(remoteBranchCommand);
+export const remoteCommand = groupAction(
+  new Command("remote")
+    .description("Manage the remote of your dotfiles repository")
+    .addCommand(remoteSetCommand)
+    .addCommand(remoteBranchCommand),
+  runRemoteShow,
+);
 
 export default remoteCommand;
